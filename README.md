@@ -1,60 +1,84 @@
-# htn-tunnel
+<p align="center">
+  <h1 align="center">htn-tunnel</h1>
+  <p align="center">
+    Self-hosted tunnel — expose localhost to the internet
+    <br />
+    <a href="#-quick-start"><strong>Quick Start</strong></a> &middot;
+    <a href="#-hướng-dẫn-nhanh"><strong>Tiếng Việt</strong></a> &middot;
+    <a href="https://dashboard.33.id.vn/_dashboard/">Dashboard</a> &middot;
+    <a href="docs/deployment-guide.md">Deploy Guide</a>
+  </p>
+</p>
 
-[![Release](https://img.shields.io/github/v/release/nhh0718/htn-tunnel?style=flat-square)](https://github.com/nhh0718/htn-tunnel/releases)
-[![npm](https://img.shields.io/npm/v/htn-tunnel?style=flat-square)](https://www.npmjs.com/package/htn-tunnel)
-[![Go](https://img.shields.io/github/go-mod/go-version/nhh0718/htn-tunnel?style=flat-square)](https://go.dev/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+<p align="center">
+  <a href="https://github.com/nhh0718/htn-tunnel/releases"><img src="https://img.shields.io/github/v/release/nhh0718/htn-tunnel?style=flat-square&color=blue" alt="Release"></a>
+  <a href="https://www.npmjs.com/package/htn-tunnel"><img src="https://img.shields.io/npm/v/htn-tunnel?style=flat-square&color=red" alt="npm"></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/github/go-mod/go-version/nhh0718/htn-tunnel?style=flat-square" alt="Go"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
+</p>
 
-Self-hosted tunneling tool — expose localhost to the internet via a public VPS.
-
-[English](#english) | [Tieng Viet](#tieng-viet)
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS">
+  <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux">
+</p>
 
 ---
 
-## English
+## What is htn-tunnel?
 
-### What is htn-tunnel?
-
-A self-hosted alternative to ngrok/Cloudflare Tunnel. Run the server on your VPS, install the client on your machine, and expose any local port to the internet with a public HTTPS URL.
+A self-hosted alternative to ngrok / Cloudflare Tunnel. Run the server on your VPS, install the client on your machine, and expose any local port to the internet.
 
 ```
-You (localhost:3000) --tunnel--> Your VPS --internet--> https://myapp.your-domain.com
+localhost:3000  ──tunnel──▶  Your VPS  ──internet──▶  https://myapp.your-domain.com
 ```
 
 ### Features
 
-- **HTTP tunnels** — HTTPS subdomain routing (random or permanent per user)
-- **TCP tunnels** — raw port forwarding for any TCP service (databases, SSH, etc.)
-- **Auto-TLS** — wildcard Let's Encrypt cert via DNS-01 (Cloudflare)
-- **WebSocket support** — full proxy with Origin rewrite (Next.js HMR, dev servers)
-- **API key management** — self-service registration via web dashboard
-- **Fixed subdomains** — claim a subdomain, it's permanently yours
-- **User dashboard** — register, login, manage subdomains
-- **Admin dashboard** — manage users, tunnels, edit server config
-- **Auto-reconnect** — heartbeat keepalive + exponential backoff
-- **Single binary** — no runtime dependencies, cross-platform
+| Feature | Description |
+|---------|-------------|
+| **HTTP tunnels** | HTTPS subdomain routing (random or permanent) |
+| **TCP tunnels** | Raw port forwarding (databases, SSH, etc.) |
+| **Auto-TLS** | Wildcard Let's Encrypt via DNS-01 (Cloudflare) |
+| **WebSocket** | Full proxy with Origin rewrite (HMR, dev servers) |
+| **API keys** | Self-service registration via web dashboard |
+| **Fixed subdomains** | Claim once, yours forever |
+| **User dashboard** | Register, login, manage subdomains |
+| **Admin dashboard** | Manage users, tunnels, server config |
+| **Auto-reconnect** | Heartbeat + exponential backoff |
+| **Single binary** | No dependencies, cross-platform |
 
 ---
 
-### Getting Started (Step by Step)
+## Install
 
-#### Step 1: Install the client
-
-Choose one method:
-
-**Option A: Go install** (if you have Go installed)
+<table>
+<tr><td><b>go install</b></td><td><b>npm</b></td><td><b>Binary</b></td></tr>
+<tr>
+<td>
 
 ```bash
 go install github.com/nhh0718/htn-tunnel/cmd/htn-tunnel@latest
 ```
 
-**Option B: npm** (if you have Node.js installed)
+</td>
+<td>
 
 ```bash
 npm install -g htn-tunnel
 ```
 
-**Option C: Download binary** from [GitHub Releases](https://github.com/nhh0718/htn-tunnel/releases)
+</td>
+<td>
+
+Download from [Releases](https://github.com/nhh0718/htn-tunnel/releases)
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>Platform-specific download commands</b></summary>
 
 ```bash
 # Linux (amd64)
@@ -65,312 +89,284 @@ sudo mv htn-tunnel /usr/local/bin/
 curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-tunnel_darwin_arm64.tar.gz | tar xz
 sudo mv htn-tunnel /usr/local/bin/
 
-# Windows — download .zip from the Releases page and add to PATH
+# Windows — download .zip from Releases, extract, add to PATH
 ```
+</details>
 
-#### Step 2: Register an account
+---
 
-Open the dashboard in your browser:
+## Quick Start
 
-```
-https://<server-address>:1807/_dashboard/
-```
+### 1. Register
 
-1. Click **Register**
-2. Enter your **name** and desired **subdomain** (e.g. `myapp`)
-3. Click **Create Account**
-4. **Copy your API key** (starts with `htk_...`) — save it somewhere safe!
+Open the dashboard in your browser and create an account:
 
-> You only need to register once. Your subdomain is permanently reserved.
+> **https://dashboard.33.id.vn/_dashboard/**
 
-#### Step 3: Save your API key
+Click **Register** → enter your name + desired subdomain → **Create Account** → copy your API key (`htk_...`)
+
+### 2. Save your key
 
 ```bash
-htn-tunnel auth htk_your_key_here --server your-server:4443
+htn-tunnel auth htk_your_key_here --server 33.id.vn:4443
 ```
 
-This saves the key to `~/.htn-tunnel/config.yaml`. You only need to do this once.
-
-#### Step 4: Start a tunnel
+### 3. Start tunneling
 
 ```bash
-# Expose a local web server on port 3000
 htn-tunnel http 3000 --subdomain myapp
 ```
 
-Output:
 ```
-htn-tunnel vdev
-
-  Tunnel:    https://myapp.your-domain.com -> localhost:3000
+  Tunnel:    https://myapp.33.id.vn → localhost:3000
   Status:    connected
 ```
 
-Open `https://myapp.your-domain.com` in your browser — it shows your local app!
+That's it! Open `https://myapp.33.id.vn` in any browser.
 
-#### Step 5: (Optional) TCP tunnel
+> Your subdomain is permanently yours. Reconnect anytime with the same `--subdomain`.
+
+### TCP tunnel
 
 ```bash
-# Expose PostgreSQL on port 5432
 htn-tunnel tcp 5432
+#  Tunnel:    tcp://33.id.vn:34567 → localhost:5432
 ```
-
-Output:
-```
-  Tunnel:    tcp://remote:34567 -> localhost:5432
-  Status:    connected
-```
-
-Connect from anywhere: `psql -h your-server -p 34567 -U postgres`
 
 ---
 
-### Managing Your Account
+## CLI Reference
 
-#### Dashboard
-
-Open `https://<server>:1807/_dashboard/` and login with your API key to:
-- View your subdomains (online/offline status)
-- Add or remove subdomains
-- See active tunnel stats (uptime, bandwidth)
-- Copy quick-start commands
-
-#### CLI status
-
-```bash
-htn-tunnel status
 ```
-
-Shows your account info, owned subdomains, and server connection.
-
----
-
-### CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `htn-tunnel http <port>` | Create HTTP tunnel to localhost:port |
-| `htn-tunnel tcp <port>` | Create TCP tunnel to localhost:port |
-| `htn-tunnel auth <token>` | Save API key to config |
-| `htn-tunnel status` | Show account info |
-
-**Flags:**
+htn-tunnel http <port> [--subdomain name]    Create HTTP tunnel
+htn-tunnel tcp  <port>                       Create TCP tunnel
+htn-tunnel auth <key>  [--server host:port]  Save API key
+htn-tunnel status                            Show account info
+```
 
 | Flag | Description |
 |------|-------------|
-| `--subdomain <name>` | Request a fixed subdomain (HTTP only) |
-| `--server <host:port>` | Override server address |
+| `--subdomain <name>` | Fixed subdomain (HTTP only) |
+| `--server <host:port>` | Server address |
 | `--token <key>` | Override auth token |
 
 ---
 
-### Server Setup (for VPS admins)
+## Dashboard
 
-See the full [Deployment Guide](docs/deployment-guide.md) for:
-- VPS requirements and setup
-- DNS configuration (Cloudflare)
-- nginx coexistence (stream SNI routing)
-- systemd service
-- TLS certificate management
+| | URL | Auth |
+|---|---|---|
+| **User** | `https://dashboard.33.id.vn/_dashboard/` | API key |
+| **Admin** | `https://dashboard.33.id.vn/_admin/` | Admin key |
 
-Quick overview:
-```bash
-# Build
-GOOS=linux GOARCH=amd64 go build -o htn-server ./cmd/server
+**User dashboard:** register, manage subdomains, view tunnel stats
 
-# Upload + configure
-scp htn-server root@your-vps:/usr/local/bin/
-# Edit /etc/htn-tunnel/server.yaml — see deployment guide
-
-# Start
-systemctl enable --now htn-tunnel
-```
-
-**Admin dashboard:** `https://<server>:1807/_admin/` — login with admin key to manage users, tunnels, and server config.
-
-### Architecture
-
-```
-Internet -> Port 443 (nginx stream, SNI routing)
-|-- *.domain.com  -> htn-tunnel:8443 (TLS passthrough)
-|-- * (default)   -> nginx:4430 (other sites)
-
-htn-tunnel server:
-  :4443  Control plane (client connections, yamux)
-  :8443  HTTP tunnel proxy (certmagic wildcard TLS)
-  :8444  HTTP redirect
-  :1807  Dashboard (user /_dashboard/ + admin /_admin/)
-```
-
-### Documentation
-
-- [Deployment Guide](docs/deployment-guide.md) — Full VPS setup
-- [Publish Guide](docs/publish-guide.md) — npm + GitHub Releases publishing
-- [Commands Reference](docs/commands.md) — All VPS management commands
-
-### License
-
-[MIT](LICENSE)
+**Admin dashboard:** manage all users, view all tunnels, edit server config
 
 ---
 
-## Tiếng Việt
-
-### htn-tunnel là gì?
-
-Công cụ tunnel tự host — thay thế ngrok/Cloudflare Tunnel. Chạy server trên VPS, cài client trên máy bạn, expose bất kỳ port local nào ra internet với URL HTTPS.
+## Architecture
 
 ```
-Máy bạn (localhost:3000) --tunnel--> VPS của bạn --internet--> https://myapp.domain.com
+Internet → Port 443 (nginx stream, SNI routing)
+├── dashboard.33.id.vn  → nginx:4430 → proxy → :1807 (dashboard)
+├── *.33.id.vn           → TLS passthrough → :8443 (tunnel proxy)
+└── * (other domains)    → nginx:4430 (certbot TLS)
+
+htn-tunnel server:
+  :4443   Control plane (yamux multiplexing)
+  :8443   HTTP tunnel proxy (certmagic wildcard TLS)
+  :1807   Dashboard (user + admin)
+```
+
+---
+
+## Server Setup
+
+See **[Deployment Guide](docs/deployment-guide.md)** for full instructions.
+
+```bash
+GOOS=linux GOARCH=amd64 go build -o htn-server ./cmd/server
+scp htn-server root@your-vps:/usr/local/bin/
+# See deployment guide for server.yaml, systemd, nginx, DNS
+```
+
+---
+
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [Deployment Guide](docs/deployment-guide.md) | VPS setup, nginx, DNS, systemd |
+| [Publish Guide](docs/publish-guide.md) | npm + GitHub Releases CI/CD |
+| [Commands Reference](docs/commands.md) | All VPS management commands |
+
+---
+
+## License
+
+[MIT](LICENSE) — use it however you want.
+
+---
+
+<br>
+
+<h1 align="center">htn-tunnel <sub><sup>Tiếng Việt</sup></sub></h1>
+
+<p align="center">Công cụ tunnel tự host — expose localhost ra internet qua VPS của bạn</p>
+
+---
+
+## Htn-tunnel là gì?
+
+Thay thế ngrok / Cloudflare Tunnel. Chạy server trên VPS, cài client trên máy bạn, expose bất kỳ port local nào ra internet với URL HTTPS.
+
+```
+Máy bạn (localhost:3000)  ──tunnel──▶  VPS  ──internet──▶  https://myapp.33.id.vn
 ```
 
 ### Tính năng
 
-- **HTTP tunnels** — subdomain HTTPS (random hoặc cố định vĩnh viễn)
-- **TCP tunnels** — forward port bất kỳ (database, SSH, ...)
-- **Auto-TLS** — wildcard Let's Encrypt cert qua DNS-01 (Cloudflare)
-- **WebSocket** — proxy đầy đủ, hỗ trợ HMR (Next.js, Vite, ...)
-- **API key** — người dùng tự đăng ký qua dashboard
-- **Subdomain cố định** — claim 1 lần, dùng mãi mãi
-- **User dashboard** — đăng ký, đăng nhập, quản lý subdomain
-- **Admin dashboard** — quản lý users, tunnels, sửa config server
-- **Tự động kết nối lại** — heartbeat + exponential backoff
-- **Single binary** — không cần cài thêm gì, chạy mọi nền tảng
+| Tính năng | Mô tả |
+|-----------|-------|
+| **HTTP tunnels** | Subdomain HTTPS (random hoặc cố định vĩnh viễn) |
+| **TCP tunnels** | Forward port bất kỳ (database, SSH, ...) |
+| **Auto-TLS** | Wildcard Let's Encrypt qua DNS-01 (Cloudflare) |
+| **WebSocket** | Proxy đầy đủ, hỗ trợ HMR (Next.js, Vite) |
+| **API key** | Người dùng tự đăng ký qua dashboard |
+| **Subdomain cố định** | Claim 1 lần, dùng mãi mãi |
+| **User dashboard** | Đăng ký, đăng nhập, quản lý subdomain |
+| **Admin dashboard** | Quản lý users, tunnels, sửa config |
+| **Tự động kết nối lại** | Heartbeat + exponential backoff |
+| **Single binary** | Không cần cài thêm gì, chạy mọi nền tảng |
 
 ---
 
-### Hướng dẫn sử dụng (từng bước)
+## Cài đặt
 
-#### Bước 1: Cài client
-
-Chọn 1 trong 3 cách:
-
-**Cách A: Go install** (nếu đã cài Go)
+<table>
+<tr><td><b>go install</b></td><td><b>npm</b></td><td><b>Binary</b></td></tr>
+<tr>
+<td>
 
 ```bash
 go install github.com/nhh0718/htn-tunnel/cmd/htn-tunnel@latest
 ```
 
-**Cách B: npm** (nếu đã cài Node.js)
+</td>
+<td>
 
 ```bash
 npm install -g htn-tunnel
 ```
 
-**Cách C: Tải binary** từ [GitHub Releases](https://github.com/nhh0718/htn-tunnel/releases)
+</td>
+<td>
+
+Tải từ [Releases](https://github.com/nhh0718/htn-tunnel/releases)
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>Lệnh tải theo nền tảng</b></summary>
 
 ```bash
 # Linux
 curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-tunnel_linux_amd64.tar.gz | tar xz
 sudo mv htn-tunnel /usr/local/bin/
 
-# macOS
+# macOS (Apple Silicon)
 curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-tunnel_darwin_arm64.tar.gz | tar xz
 sudo mv htn-tunnel /usr/local/bin/
 
-# Windows — tải file .zip từ trang Releases, giải nén, thêm vào PATH
+# Windows — tải .zip từ Releases, giải nén, thêm vào PATH
 ```
+</details>
 
-#### Bước 2: Đăng ký tài khoản
+---
+
+## Hướng dẫn nhanh
+
+### 1. Đăng ký tài khoản
 
 Mở dashboard trong trình duyệt:
 
-```
-https://dashboard.33.id.vn/_dashboard/
-```
+> **https://dashboard.33.id.vn/_dashboard/**
 
-1. Nhấn **Register**
-2. Nhập **tên** và **subdomain** muốn dùng (ví dụ: `myapp`)
-3. Nhấn **Create Account**
-4. **Copy API key** (bắt đầu bằng `htk_...`) — lưu lại cẩn thận!
+Nhấn **Register** → nhập tên + subdomain → **Create Account** → copy API key (`htk_...`)
 
-> Chỉ cần đăng ký 1 lần. Subdomain của bạn được giữ vĩnh viễn.
-
-#### Bước 3: Lưu API key
+### 2. Lưu API key
 
 ```bash
 htn-tunnel auth htk_key_của_bạn --server 33.id.vn:4443
 ```
 
-Key được lưu vào `~/.htn-tunnel/config.yaml`. Chỉ cần làm 1 lần.
-
-#### Bước 4: Mở tunnel
+### 3. Mở tunnel
 
 ```bash
-# Expose web server local port 3000
 htn-tunnel http 3000 --subdomain myapp
 ```
 
-Kết quả:
 ```
-htn-tunnel vdev
-
-  Tunnel:    https://myapp.33.id.vn -> localhost:3000
+  Tunnel:    https://myapp.33.id.vn → localhost:3000
   Status:    connected
 ```
 
-Mở `https://myapp.33.id.vn` trên trình duyệt — hiển thị app local của bạn!
+Xong! Mở `https://myapp.33.id.vn` trên bất kỳ trình duyệt nào.
 
-#### Bước 5: (Tùy chọn) TCP tunnel
+> Subdomain của bạn là vĩnh viễn. Kết nối lại bất kỳ lúc nào với cùng `--subdomain`.
+
+### TCP tunnel
 
 ```bash
-# Expose PostgreSQL port 5432
 htn-tunnel tcp 5432
-```
-
-Kết nối từ bất kỳ đâu: `psql -h 33.id.vn -p 34567 -U postgres`
-
----
-
-### Quản lý tài khoản
-
-#### Dashboard
-
-Mở `https://dashboard.33.id.vn/_dashboard/` và đăng nhập bằng API key để:
-- Xem subdomain (online/offline)
-- Thêm hoặc xóa subdomain
-- Xem thống kê tunnel (uptime, bandwidth)
-- Copy lệnh quick-start
-
-#### CLI
-
-```bash
-htn-tunnel status    # Xem thông tin tài khoản, subdomain
+#  Tunnel:    tcp://33.id.vn:34567 → localhost:5432
 ```
 
 ---
 
-### Hướng dẫn sử dụng CLI
+## Hướng dẫn CLI
 
-| Lệnh | Mô tả |
-|------|-------|
-| `htn-tunnel http <port>` | Tạo HTTP tunnel tới localhost:port |
-| `htn-tunnel tcp <port>` | Tạo TCP tunnel tới localhost:port |
-| `htn-tunnel auth <token>` | Lưu API key vào config |
-| `htn-tunnel status` | Xem thông tin tài khoản |
-
-**Flags:**
+```
+htn-tunnel http <port> [--subdomain tên]     Tạo HTTP tunnel
+htn-tunnel tcp  <port>                       Tạo TCP tunnel
+htn-tunnel auth <key>  [--server host:port]  Lưu API key
+htn-tunnel status                            Xem thông tin tài khoản
+```
 
 | Flag | Mô tả |
 |------|-------|
-| `--subdomain <tên>` | Yêu cầu subdomain cố định (chỉ HTTP) |
+| `--subdomain <tên>` | Subdomain cố định (chỉ HTTP) |
 | `--server <host:port>` | Địa chỉ server |
 | `--token <key>` | Override auth token |
 
 ---
 
-### Cài đặt Server (cho admin VPS)
+## Quản lý tài khoản
 
-Xem [Deployment Guide](docs/deployment-guide.md) chi tiết.
+| | URL | Xác thực |
+|---|---|---|
+| **Người dùng** | `https://dashboard.33.id.vn/_dashboard/` | API key |
+| **Admin** | `https://dashboard.33.id.vn/_admin/` | Admin key |
 
-**Admin dashboard:** `https://dashboard.33.id.vn/_admin/` — đăng nhập bằng admin key để quản lý users, tunnels, config.
+**User dashboard:** đăng ký, quản lý subdomain, xem thống kê tunnel
 
-### Tài liệu
+**Admin dashboard:** quản lý users, tunnels, sửa cấu hình server
 
-- [Deployment Guide](docs/deployment-guide.md) — Hướng dẫn deploy VPS đầy đủ
-- [Publish Guide](docs/publish-guide.md) — Hướng dẫn publish npm + GitHub Releases
-- [Commands Reference](docs/commands.md) — Tất cả lệnh quản trị VPS
+---
 
-### License
+## Tài liệu
+
+| Tài liệu | Mô tả |
+|-----------|-------|
+| [Deployment Guide](docs/deployment-guide.md) | Hướng dẫn deploy VPS đầy đủ |
+| [Publish Guide](docs/publish-guide.md) | Publish npm + GitHub Releases |
+| [Commands Reference](docs/commands.md) | Tất cả lệnh quản trị VPS |
+
+---
+
+## License
 
 [MIT](LICENSE)
