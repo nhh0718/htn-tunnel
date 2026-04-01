@@ -31,7 +31,7 @@ func main() {
 	root.PersistentFlags().StringVar(&flagServer, "server", "", "server address (host:port)")
 	root.PersistentFlags().StringVar(&flagToken, "token", "", "override auth token")
 
-	root.AddCommand(httpCmd(), tcpCmd(), authCmd())
+	root.AddCommand(httpCmd(), tcpCmd(), authCmd(), statusCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -123,6 +123,60 @@ func authCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// statusCmd shows current key info and subdomains by querying the server.
+func statusCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show your account info and subdomains",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadClientCfg()
+			if err != nil {
+				return err
+			}
+
+			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer cancel()
+
+			c := client.NewClient(cfg)
+			if err := c.Connect(ctx); err != nil {
+				return fmt.Errorf("connect: %w", err)
+			}
+			defer c.Close()
+
+			info, err := c.GetAccountInfo()
+			if err != nil {
+				return err
+			}
+
+			masked := cfg.Token
+			if len(masked) > 12 {
+				masked = masked[:8] + "..." + masked[len(masked)-4:]
+			}
+			fmt.Printf("\nhtn-tunnel status\n\n")
+			fmt.Printf("  Key:         %s\n", masked)
+			fmt.Printf("  Name:        %s\n", info.Name)
+			fmt.Printf("  Subdomains:  %s\n", joinOrNone(info.Subdomains))
+			fmt.Printf("  Max tunnels: %d\n", info.MaxTunnels)
+			fmt.Printf("  Server:      %s\n\n", cfg.ServerAddr)
+			return nil
+		},
+	}
+}
+
+func joinOrNone(ss []string) string {
+	if len(ss) == 0 {
+		return "(none)"
+	}
+	result := ""
+	for i, s := range ss {
+		if i > 0 {
+			result += ", "
+		}
+		result += s
+	}
+	return result
 }
 
 // loadClientCfg loads the client config file and applies flag overrides.

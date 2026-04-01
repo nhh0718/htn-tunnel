@@ -78,6 +78,32 @@ func (c *Client) RequestTCPTunnel(localPort int) (*TunnelInfo, error) {
 	return &TunnelInfo{RemotePort: resp.RemotePort, LocalPort: localPort}, nil
 }
 
+// AccountInfo holds the server's response to an account info request.
+type AccountInfo struct {
+	Name       string   `json:"name"`
+	Subdomains []string `json:"subdomains"`
+	MaxTunnels int      `json:"max_tunnels"`
+}
+
+// GetAccountInfo queries the server for the current key's account details.
+func (c *Client) GetAccountInfo() (*AccountInfo, error) {
+	if err := c.enc.Encode(protocol.MsgAccountInfo, nil); err != nil {
+		return nil, fmt.Errorf("send account info request: %w", err)
+	}
+	msgType, raw, err := c.dec.Decode()
+	if err != nil {
+		return nil, fmt.Errorf("read account info response: %w", err)
+	}
+	if msgType != protocol.MsgAccountInfoResp {
+		return nil, fmt.Errorf("unexpected message type %d", msgType)
+	}
+	var info AccountInfo
+	if err := json.Unmarshal(raw, &info); err != nil {
+		return nil, fmt.Errorf("decode account info: %w", err)
+	}
+	return &info, nil
+}
+
 // ServeTunnel accepts yamux streams from the server and forwards each one to
 // localhost:localPort. Works identically for HTTP and TCP tunnels — both are
 // raw byte streams at the yamux layer; the server handles protocol differences.

@@ -38,7 +38,7 @@ func main() {
 
 	slog.Info("starting htn-tunnel-server", "version", version)
 
-	srv, err := server.NewServer(cfg)
+	srv, err := server.NewServer(cfg, path)
 	if err != nil {
 		slog.Error("init server", "err", err)
 		os.Exit(1)

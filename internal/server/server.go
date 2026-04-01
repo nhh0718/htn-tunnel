@@ -37,27 +37,35 @@ const reservationTTL = 60 * time.Second
 
 // Server is the main relay server.
 type Server struct {
-	cfg           *config.ServerConfig
-	tokenStore    *TokenStore
-	rateLimiter   *RateLimiter
-	ipLimiter     *ipRateLimiter
-	tunnelManager *TunnelManager
-	httpProxy     *HTTPProxy
-	tcpProxy      *TCPProxy
-	listener      net.Listener
+	cfg            *config.ServerConfig
+	configProvider *ConfigProvider
+	tokenStore     *TokenStore
+	keyStore       *KeyStore
+	rateLimiter    *RateLimiter
+	ipLimiter      *ipRateLimiter
+	tunnelManager  *TunnelManager
+	httpProxy      *HTTPProxy
+	tcpProxy       *TCPProxy
+	listener       net.Listener
 }
 
-// NewServer creates a Server from cfg. Call Start() to begin accepting connections.
-func NewServer(cfg *config.ServerConfig) (*Server, error) {
+// NewServer creates a Server from cfg. configPath is the yaml file path for config editing.
+func NewServer(cfg *config.ServerConfig, configPath string) (*Server, error) {
 	ts, err := NewTokenStore(cfg.Tokens, cfg.MaxTunnelsPerToken)
 	if err != nil {
 		return nil, fmt.Errorf("init token store: %w", err)
 	}
+	ks, err := NewKeyStore(cfg.KeyStorePath)
+	if err != nil {
+		return nil, fmt.Errorf("init key store: %w", err)
+	}
 	tm := NewTunnelManager(cfg.TCPPortRange[0], cfg.TCPPortRange[1])
 	tcp := NewTCPProxy(tm)
 	return &Server{
-		cfg:           cfg,
-		tokenStore:    ts,
+		cfg:            cfg,
+		configProvider: NewConfigProvider(cfg, configPath),
+		tokenStore:     ts,
+		keyStore:       ks,
 		rateLimiter:   NewRateLimiter(cfg.RateLimit, cfg.GlobalRateLimit),
 		ipLimiter:     newIPRateLimiter(10), // 10 pre-auth conn/min per IP
 		tunnelManager: tm,
@@ -74,7 +82,7 @@ func (s *Server) startDashboard(ctx context.Context) {
 	if !s.cfg.DashboardEnabled {
 		return
 	}
-	h := dashboard.NewHandler(s.tunnelManager, s.cfg.AdminToken)
+	h := dashboard.NewHandler(s.tunnelManager, NewKeyStoreAdapter(s.keyStore), s.configProvider, s.cfg.AdminToken, s.cfg.Domain)
 	srv := &http.Server{
 		Addr:    s.cfg.DashboardAddr,
 		Handler: h,
@@ -161,12 +169,19 @@ func (s *Server) handleConnection(conn net.Conn) {
 	enc := protocol.NewEncoder(conn)
 	dec := protocol.NewDecoder(conn)
 
-	// First message MUST be Auth.
+	// First message: Auth or Register.
 	msgType, raw, err := dec.Decode()
 	if err != nil {
 		slog.Warn("auth read error", "ip", remoteIP, "err", err)
 		return
 	}
+
+	// Handle registration (one-shot, no session).
+	if msgType == protocol.MsgRegister {
+		s.handleRegister(enc, raw, remoteIP)
+		return
+	}
+
 	if msgType != protocol.MsgAuth {
 		slog.Warn("expected Auth, got wrong message type", "ip", remoteIP, "type", msgType)
 		return
@@ -178,8 +193,15 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
-	// Validate token.
-	if !s.tokenStore.Validate(authMsg.Token) {
+	// Validate token: try API key store first, then legacy tokens.
+	tokenValid := false
+	if IsAPIKey(authMsg.Token) {
+		tokenValid = s.keyStore.Validate(authMsg.Token)
+	} else {
+		tokenValid = s.tokenStore.Validate(authMsg.Token)
+	}
+
+	if !tokenValid {
 		slog.Warn("auth failed", "ip", remoteIP, "token_prefix", maskToken(authMsg.Token))
 		_ = enc.Encode(protocol.MsgAuthResponse, protocol.AuthResponseMsg{
 			Success: false, Message: "invalid token",
@@ -218,6 +240,44 @@ func (s *Server) handleConnection(conn net.Conn) {
 	s.handleControlSession(session, authMsg.Token, remoteIP)
 }
 
+// handleRegister processes a self-service registration request (no auth required).
+func (s *Server) handleRegister(enc *protocol.Encoder, raw []byte, remoteIP string) {
+	if s.cfg.AllowRegistration != nil && !*s.cfg.AllowRegistration {
+		_ = enc.Encode(protocol.MsgRegisterResp, protocol.RegisterResponseMsg{
+			Success: false, Message: "registration is disabled",
+		})
+		return
+	}
+
+	var msg protocol.RegisterMsg
+	if err := json.Unmarshal(raw, &msg); err != nil {
+		_ = enc.Encode(protocol.MsgRegisterResp, protocol.RegisterResponseMsg{
+			Success: false, Message: "invalid request",
+		})
+		return
+	}
+
+	var subdomains []string
+	if msg.Subdomain != "" {
+		subdomains = []string{msg.Subdomain}
+	}
+
+	key, err := s.keyStore.CreateKey(msg.Name, subdomains, 10)
+	if err != nil {
+		_ = enc.Encode(protocol.MsgRegisterResp, protocol.RegisterResponseMsg{
+			Success: false, Message: err.Error(),
+		})
+		return
+	}
+
+	slog.Info("user registered", "ip", remoteIP, "name", msg.Name, "subdomain", msg.Subdomain)
+	_ = enc.Encode(protocol.MsgRegisterResp, protocol.RegisterResponseMsg{
+		Success:    true,
+		Key:        key,
+		Subdomains: subdomains,
+	})
+}
+
 // handleControlSession accepts the client's control stream (the first yamux stream
 // the client opens), then reads TunnelRequest/Heartbeat messages from it.
 func (s *Server) handleControlSession(session *yamux.Session, token, remoteIP string) {
@@ -253,6 +313,9 @@ func (s *Server) handleControlSession(session *yamux.Session, token, remoteIP st
 					return
 				}
 
+			case protocol.MsgAccountInfo:
+				s.handleAccountInfo(enc, token)
+
 			case protocol.MsgTunnelReq:
 				var req protocol.TunnelRequestMsg
 				if err := json.Unmarshal(raw, &req); err != nil {
@@ -283,6 +346,32 @@ func (s *Server) handleControlSession(session *yamux.Session, token, remoteIP st
 	}
 }
 
+// handleAccountInfo responds with account details for the authenticated key.
+func (s *Server) handleAccountInfo(enc *protocol.Encoder, token string) {
+	if IsAPIKey(token) {
+		k := s.keyStore.GetKey(token)
+		if k != nil {
+			_ = enc.Encode(protocol.MsgAccountInfoResp, protocol.AccountInfoRespMsg{
+				Name: k.Name, Subdomains: k.Subdomains, MaxTunnels: k.MaxTunnels,
+			})
+			return
+		}
+	}
+	// Legacy tokens don't have account info.
+	_ = enc.Encode(protocol.MsgAccountInfoResp, protocol.AccountInfoRespMsg{
+		Name: "legacy", MaxTunnels: s.cfg.MaxTunnelsPerToken,
+	})
+}
+
+// decrementTunnels handles both API keys and legacy tokens.
+func (s *Server) decrementTunnels(token string) {
+	if IsAPIKey(token) {
+		s.keyStore.DecrementTunnels(token)
+	} else {
+		s.tokenStore.DecrementTunnels(token)
+	}
+}
+
 // handleTunnelRequest validates and dispatches a TunnelRequest.
 func (s *Server) handleTunnelRequest(
 	session *yamux.Session,
@@ -302,10 +391,17 @@ func (s *Server) handleTunnelRequest(
 		return
 	}
 
-	// Check tunnel count.
-	if err := s.tokenStore.IncrementTunnels(token); err != nil {
-		sendTunnelError(enc, err.Error())
-		return
+	// Check tunnel count (API key vs legacy token).
+	if IsAPIKey(token) {
+		if err := s.keyStore.IncrementTunnels(token); err != nil {
+			sendTunnelError(enc, err.Error())
+			return
+		}
+	} else {
+		if err := s.tokenStore.IncrementTunnels(token); err != nil {
+			sendTunnelError(enc, err.Error())
+			return
+		}
 	}
 
 	ts := &TunnelSession{
@@ -323,7 +419,7 @@ func (s *Server) handleTunnelRequest(
 	case protocol.TunnelTCP:
 		s.registerTCPTunnel(ts, enc, token)
 	default:
-		s.tokenStore.DecrementTunnels(token)
+		s.decrementTunnels(token)
 		sendTunnelError(enc, fmt.Sprintf("unknown tunnel type %q", req.Type))
 	}
 }
@@ -344,13 +440,13 @@ func (s *Server) registerHTTPTunnel(
 				goto registered
 			}
 		}
-		s.tokenStore.DecrementTunnels(token)
+		s.decrementTunnels(token)
 		sendTunnelError(enc, "could not allocate subdomain")
 		return
 	}
 	ts.Subdomain = subdomain
 	if err := s.tunnelManager.RegisterHTTP(subdomain, ts); err != nil {
-		s.tokenStore.DecrementTunnels(token)
+		s.decrementTunnels(token)
 		sendTunnelError(enc, err.Error())
 		return
 	}
@@ -365,13 +461,13 @@ registered:
 
 func (s *Server) registerTCPTunnel(ts *TunnelSession, enc *protocol.Encoder, token string) {
 	if s.tcpProxy == nil {
-		s.tokenStore.DecrementTunnels(token)
+		s.decrementTunnels(token)
 		sendTunnelError(enc, "TCP tunnels not available")
 		return
 	}
 	port, err := s.tcpProxy.StartTCPTunnel(ts)
 	if err != nil {
-		s.tokenStore.DecrementTunnels(token)
+		s.decrementTunnels(token)
 		sendTunnelError(enc, fmt.Sprintf("allocate TCP port: %v", err))
 		return
 	}
@@ -396,7 +492,7 @@ func (s *Server) cleanupSession(session *yamux.Session, token string) {
 				s.tunnelManager.UnregisterTCP(ts.Port)
 			}
 		}
-		s.tokenStore.DecrementTunnels(token)
+		s.decrementTunnels(token)
 	}
 }
 

@@ -302,6 +302,31 @@ func (tm *TunnelManager) ListTunnelsForDashboard() []dashboard.TunnelStats {
 	return out
 }
 
+// TunnelsForToken returns tunnels belonging to a specific token/key.
+func (tm *TunnelManager) TunnelsForToken(token string) []dashboard.TunnelStats {
+	all := tm.ListTunnels()
+	out := make([]dashboard.TunnelStats, 0)
+	for _, t := range all {
+		if t.Token != token {
+			continue
+		}
+		uptime := time.Since(t.CreatedAt).Truncate(time.Second).String()
+		out = append(out, dashboard.TunnelStats{
+			ID:        t.ID,
+			Type:      t.Type,
+			Subdomain: t.Subdomain,
+			Port:      t.Port,
+			LocalPort: t.LocalPort,
+			Token:     maskToken(t.Token),
+			Uptime:    uptime,
+			BytesIn:   t.BytesIn,
+			BytesOut:  t.BytesOut,
+			CreatedAt: t.CreatedAt,
+		})
+	}
+	return out
+}
+
 // StatsForDashboard satisfies dashboard.TunnelProvider.
 func (tm *TunnelManager) StatsForDashboard() dashboard.AggregateStats {
 	s := tm.Stats()

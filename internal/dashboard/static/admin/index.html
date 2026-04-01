@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>htn-tunnel Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Login -->
+  <section id="page-login" class="page">
+    <div class="login-box">
+      <h1>htn-tunnel Admin</h1>
+      <form onsubmit="return handleLogin(event)">
+        <input type="password" id="admin-key" placeholder="Admin Key" required>
+        <div id="login-error" class="error"></div>
+        <button type="submit" class="btn-primary">Login</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Panel -->
+  <section id="page-panel" class="page" style="display:none">
+    <header>
+      <h1>htn-tunnel Admin</h1>
+      <button onclick="logout()">Logout</button>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-value" id="stat-keys">-</div><div class="stat-label">Users</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-http">-</div><div class="stat-label">HTTP</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-tcp">-</div><div class="stat-label">TCP</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-bw">-</div><div class="stat-label">Bandwidth</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('users')">Users</button>
+      <button class="tab" onclick="showTab('tunnels')">Tunnels</button>
+      <button class="tab" onclick="showTab('config')">Config</button>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="tab-users" class="tab-content">
+      <table>
+        <thead><tr>
+          <th>Key</th><th>Name</th><th>Subdomains</th><th>Limit</th><th>Status</th><th>Created</th><th>Action</th>
+        </tr></thead>
+        <tbody id="keys-tbody">
+          <tr><td colspan="7" class="empty">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Tunnels Tab -->
+    <div id="tab-tunnels" class="tab-content" style="display:none">
+      <table>
+        <thead><tr>
+          <th>Type</th><th>Subdomain / Port</th><th>Local</th><th>User</th><th>Uptime</th><th>In / Out</th><th>Action</th>
+        </tr></thead>
+        <tbody id="tunnels-tbody">
+          <tr><td colspan="7" class="empty">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Config Tab -->
+    <div id="tab-config" class="tab-content" style="display:none">
+      <form id="config-form" onsubmit="return handleSaveConfig(event)">
+        <div class="config-grid">
+          <label>Domain <input type="text" id="cfg-domain"></label>
+          <label>Max tunnels per key <input type="number" id="cfg-max-tunnels" min="1" max="100"></label>
+          <label>Rate limit (req/min) <input type="number" id="cfg-rate-limit" min="1"></label>
+          <label>Global rate limit <input type="number" id="cfg-global-rate-limit" min="1"></label>
+          <label class="checkbox-label"><input type="checkbox" id="cfg-allow-reg"> Allow registration</label>
+        </div>
+        <div id="config-msg" class="config-msg"></div>
+        <button type="submit" class="btn-primary">Save & Apply</button>
+      </form>
+    </div>
+
+    <footer><span id="last-updated">-</span></footer>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

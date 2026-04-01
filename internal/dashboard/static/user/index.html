@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>htn-tunnel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>htn-tunnel</h1>
+    <div id="user-nav" style="display:none">
+      <span id="user-name"></span>
+      <button onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <!-- Landing -->
+  <section id="page-landing" class="page">
+    <div class="hero">
+      <p>Expose your localhost to the internet</p>
+      <div class="actions">
+        <button class="btn-primary" onclick="showPage('register')">Register</button>
+        <button class="btn-secondary" onclick="showPage('login')">Login</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Register -->
+  <section id="page-register" class="page" style="display:none">
+    <h2>Create your account</h2>
+    <form id="register-form" onsubmit="return handleRegister(event)">
+      <label>Name <input type="text" id="reg-name" required placeholder="Your name"></label>
+      <label>Subdomain
+        <div class="subdomain-input">
+          <input type="text" id="reg-subdomain" placeholder="myname" pattern="[a-z0-9][a-z0-9-]{1,61}[a-z0-9]">
+          <span class="domain-suffix" id="domain-suffix">.example.com</span>
+        </div>
+      </label>
+      <div id="reg-error" class="error"></div>
+      <button type="submit" class="btn-primary">Create Account</button>
+    </form>
+
+    <div id="reg-success" style="display:none">
+      <h3>Account created!</h3>
+      <div class="key-box">
+        <p>Your API Key (save this!):</p>
+        <code id="reg-key"></code>
+        <button onclick="copyKey()">Copy</button>
+      </div>
+      <div class="quickstart">
+        <h4>Quick start:</h4>
+        <pre id="reg-quickstart"></pre>
+      </div>
+      <button class="btn-primary" onclick="loginWithKey(document.getElementById('reg-key').textContent)">Go to Dashboard</button>
+    </div>
+    <p><a href="#" onclick="showPage('login')">Already have a key? Login</a></p>
+  </section>
+
+  <!-- Login -->
+  <section id="page-login" class="page" style="display:none">
+    <h2>Login</h2>
+    <form onsubmit="return handleLogin(event)">
+      <label>API Key <input type="text" id="login-key" required placeholder="htk_..."></label>
+      <div id="login-error" class="error"></div>
+      <button type="submit" class="btn-primary">Login</button>
+    </form>
+    <p><a href="#" onclick="showPage('register')">Need an account? Register</a></p>
+  </section>
+
+  <!-- Panel (after login) -->
+  <section id="page-panel" class="page" style="display:none">
+    <h2>Your Subdomains</h2>
+    <div id="subdomains-list"></div>
+    <form id="add-subdomain-form" onsubmit="return handleAddSubdomain(event)">
+      <input type="text" id="add-sub-input" placeholder="new-subdomain" pattern="[a-z0-9][a-z0-9-]{1,61}[a-z0-9]">
+      <button type="submit">+ Add</button>
+    </form>
+    <div id="sub-error" class="error"></div>
+
+    <h2>Active Tunnels</h2>
+    <div id="tunnels-list">
+      <p class="empty">No active tunnels</p>
+    </div>
+
+    <h2>Quick Start</h2>
+    <pre id="panel-quickstart"></pre>
+
+    <details>
+      <summary>Your API Key</summary>
+      <code id="panel-key"></code>
+    </details>
+  </section>
+
+  <footer>
+    <span>Powered by <a href="https://github.com/nhh0718/htn-tunnel">htn-tunnel</a></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

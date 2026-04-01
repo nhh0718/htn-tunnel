@@ -14,12 +14,16 @@ const (
 	// Reject and close connection if exceeded to prevent memory exhaustion.
 	MaxMessageSize = 1 << 20 // 1 MB
 
-	MsgAuth         MsgType = 0x01
-	MsgAuthResponse MsgType = 0x02
-	MsgTunnelReq    MsgType = 0x03
-	MsgTunnelResp   MsgType = 0x04
-	MsgHeartbeat    MsgType = 0x05
-	MsgHeartbeatAck MsgType = 0x06
+	MsgAuth            MsgType = 0x01
+	MsgAuthResponse    MsgType = 0x02
+	MsgTunnelReq       MsgType = 0x03
+	MsgTunnelResp      MsgType = 0x04
+	MsgHeartbeat       MsgType = 0x05
+	MsgHeartbeatAck    MsgType = 0x06
+	MsgRegister        MsgType = 0x0A
+	MsgRegisterResp    MsgType = 0x0B
+	MsgAccountInfo     MsgType = 0x0E
+	MsgAccountInfoResp MsgType = 0x0F
 )
 
 // AuthMsg is sent by the client as the first message on a control connection.
@@ -53,7 +57,28 @@ type TunnelRequestMsg struct {
 // TunnelResponseMsg is the server's reply to TunnelRequestMsg.
 type TunnelResponseMsg struct {
 	Success    bool   `json:"success"`
-	URL        string `json:"url,omitempty"`        // for HTTP tunnels
+	URL        string `json:"url,omitempty"`         // for HTTP tunnels
 	RemotePort int    `json:"remote_port,omitempty"` // for TCP tunnels
 	Message    string `json:"message,omitempty"`
+}
+
+// RegisterMsg is sent by a new user to create an API key (no auth required).
+type RegisterMsg struct {
+	Name      string `json:"name"`
+	Subdomain string `json:"subdomain,omitempty"`
+}
+
+// RegisterResponseMsg is the server's reply to RegisterMsg.
+type RegisterResponseMsg struct {
+	Success    bool     `json:"success"`
+	Key        string   `json:"key,omitempty"`
+	Subdomains []string `json:"subdomains,omitempty"`
+	Message    string   `json:"message,omitempty"`
+}
+
+// AccountInfoRespMsg is returned for MsgAccountInfo requests.
+type AccountInfoRespMsg struct {
+	Name       string   `json:"name"`
+	Subdomains []string `json:"subdomains"`
+	MaxTunnels int      `json:"max_tunnels"`
 }

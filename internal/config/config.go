@@ -48,6 +48,10 @@ type ServerConfig struct {
 	HTTPProxyAddr string `yaml:"http_proxy_addr"`
 	// HTTPRedirectAddr is the plain HTTP listener address that redirects to HTTPS (default ":80").
 	HTTPRedirectAddr string `yaml:"http_redirect_addr"`
+	// KeyStorePath is the path to the API keys JSON file (default "/etc/htn-tunnel/keys.json").
+	KeyStorePath string `yaml:"key_store_path"`
+	// AllowRegistration enables self-service API key registration (default true).
+	AllowRegistration *bool `yaml:"allow_registration"`
 }
 
 // defaults fills in zero values with sensible defaults.
@@ -78,6 +82,13 @@ func (c *ServerConfig) defaults() {
 	}
 	if c.HTTPRedirectAddr == "" {
 		c.HTTPRedirectAddr = ":80"
+	}
+	if c.KeyStorePath == "" {
+		c.KeyStorePath = "/etc/htn-tunnel/keys.json"
+	}
+	if c.AllowRegistration == nil {
+		t := true
+		c.AllowRegistration = &t
 	}
 	// DashboardEnabled defaults to true — apply after YAML parse only if not explicitly set.
 	// (yaml.v3 leaves bool false when the key is absent, so we can't distinguish
