@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/htn-sys/htn-tunnel/internal/client"
-	"github.com/htn-sys/htn-tunnel/internal/config"
-	"github.com/htn-sys/htn-tunnel/internal/server"
+	"github.com/nhh0718/htn-tunnel/internal/client"
+	"github.com/nhh0718/htn-tunnel/internal/config"
+	"github.com/nhh0718/htn-tunnel/internal/server"
 )
 
 // startTestServer starts a Server with DevMode enabled on a random port.

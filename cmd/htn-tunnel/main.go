@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/htn-sys/htn-tunnel/internal/client"
-	"github.com/htn-sys/htn-tunnel/internal/config"
+	"github.com/nhh0718/htn-tunnel/internal/client"
+	"github.com/nhh0718/htn-tunnel/internal/config"
 	"github.com/spf13/cobra"
 )
 

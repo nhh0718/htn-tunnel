@@ -1,4 +1,4 @@
-module github.com/htn-sys/htn-tunnel
+module github.com/nhh0718/htn-tunnel
 
 go 1.25.1
 

@@ -9,7 +9,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/htn-sys/htn-tunnel/internal/protocol"
+	"github.com/nhh0718/htn-tunnel/internal/protocol"
 )
 
 // TunnelInfo holds the result of a successful tunnel request.

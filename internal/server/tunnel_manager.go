@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/yamux"
-	"github.com/htn-sys/htn-tunnel/internal/dashboard"
+	"github.com/nhh0718/htn-tunnel/internal/dashboard"
 )
 
 // subdomainRe validates subdomain labels: lowercase alphanumeric + hyphens,

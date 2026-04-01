@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/htn-sys/htn-tunnel/internal/client"
-	"github.com/htn-sys/htn-tunnel/internal/config"
+	"github.com/nhh0718/htn-tunnel/internal/client"
+	"github.com/nhh0718/htn-tunnel/internal/config"
 )
 
 // TestAuthSuccess_Integration verifies a client can authenticate and get a success response.

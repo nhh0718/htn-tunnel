@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/caddyserver/certmagic"
-	"github.com/htn-sys/htn-tunnel/internal/config"
+	"github.com/nhh0718/htn-tunnel/internal/config"
 	"github.com/libdns/cloudflare"
 )
 

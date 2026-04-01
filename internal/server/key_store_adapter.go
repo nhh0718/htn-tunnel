@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/htn-sys/htn-tunnel/internal/dashboard"
+	"github.com/nhh0718/htn-tunnel/internal/dashboard"
 )
 
 // KeyStoreAdapter wraps KeyStore to satisfy dashboard.KeyProvider interface,

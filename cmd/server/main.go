@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/htn-sys/htn-tunnel/internal/config"
-	"github.com/htn-sys/htn-tunnel/internal/server"
+	"github.com/nhh0718/htn-tunnel/internal/config"
+	"github.com/nhh0718/htn-tunnel/internal/server"
 )
 
 // version is injected at build time via ldflags: -X main.version=<tag>

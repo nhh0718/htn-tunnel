@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"github.com/hashicorp/yamux"
-	"github.com/htn-sys/htn-tunnel/internal/config"
-	"github.com/htn-sys/htn-tunnel/internal/dashboard"
-	"github.com/htn-sys/htn-tunnel/internal/protocol"
+	"github.com/nhh0718/htn-tunnel/internal/config"
+	"github.com/nhh0718/htn-tunnel/internal/dashboard"
+	"github.com/nhh0718/htn-tunnel/internal/protocol"
 )
 
 // authTimeout is the deadline for receiving the Auth message after TCP connect.

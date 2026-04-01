@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/htn-sys/htn-tunnel/internal/config"
-	"github.com/htn-sys/htn-tunnel/internal/protocol"
+	"github.com/nhh0718/htn-tunnel/internal/config"
+	"github.com/nhh0718/htn-tunnel/internal/protocol"
 )
 
 // heartbeatInterval is how often the client sends a Heartbeat to the server.
