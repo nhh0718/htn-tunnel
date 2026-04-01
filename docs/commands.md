@@ -143,23 +143,43 @@ docker start cloud-panel-agent    # if needed
 docker stop cloud-panel-agent
 ```
 
-## Architecture (current)
+## Dashboard (qua domain)
+
+```bash
+# User dashboard
+https://dashboard.33.id.vn/_dashboard/
+
+# Admin dashboard
+https://dashboard.33.id.vn/_admin/
+
+# API test
+curl -s https://dashboard.33.id.vn/_dashboard/api/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test","subdomain":"test"}'
+
+# Admin: xem keys
+curl -s https://dashboard.33.id.vn/_admin/api/keys \
+  -H "Authorization: Bearer <admin_token>"
+```
+
+## Kiến trúc hiện tại
 
 ```
-Internet -> Port 443 (nginx stream, SNI routing)
-|-- *.33.id.vn -> TLS passthrough -> htn-tunnel:8443
-|-- * (default) -> nginx HTTP:4430 (certbot TLS)
+Internet → Port 443 (nginx stream, SNI routing)
+├── dashboard.33.id.vn → nginx:4430 → proxy → htn-tunnel:1807
+├── *.33.id.vn         → TLS passthrough → htn-tunnel:8443
+└── * (default)        → nginx HTTP:4430 (certbot TLS)
 
 htn-tunnel ports:
   :4443  - Control plane (yamux, client connections)
   :8443  - HTTP tunnel proxy (certmagic wildcard TLS)
   :8444  - HTTP redirect
-  :1807  - Dashboard (http://localhost:1807/_dashboard/)
+  :1807  - Dashboard (user /_dashboard/ + admin /_admin/)
 
 nginx ports:
-  :443   - Stream module (SNI routing only, no TLS termination)
-  :4430  - HTTPS for all other sites
-  :80    - HTTP redirects
+  :443   - Stream module (SNI routing, không TLS termination)
+  :4430  - HTTPS cho tất cả site khác + dashboard proxy
+  :80    - HTTP redirect
 ```
 
 ## Troubleshooting
