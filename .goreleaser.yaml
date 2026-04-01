@@ -1,0 +1,55 @@
+version: 2
+
+project_name: htn-tunnel
+
+builds:
+  - id: client
+    main: ./cmd/htn-tunnel
+    binary: htn-tunnel
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  - id: server
+    main: ./cmd/server
+    binary: htn-server
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: client
+    builds: [client]
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "htn-tunnel_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+  - id: server
+    builds: [server]
+    name_template: "htn-server_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

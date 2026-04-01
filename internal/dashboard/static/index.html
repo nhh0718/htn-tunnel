@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>htn-tunnel Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>htn-tunnel</h1>
+    <div id="admin-controls">
+      <span id="admin-status"></span>
+      <button id="admin-login-btn" onclick="promptAdminLogin()">Admin Login</button>
+    </div>
+  </header>
+
+  <section class="stats-grid" id="stats-section">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-label">Active Tunnels</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-http">—</div>
+      <div class="stat-label">HTTP</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-tcp">—</div>
+      <div class="stat-label">TCP</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-bw">—</div>
+      <div class="stat-label">Bandwidth ↓↑</div>
+    </div>
+  </section>
+
+  <section class="tunnels-section">
+    <div class="section-header">
+      <h2>Active Tunnels</h2>
+      <span class="refresh-label" id="refresh-label">Refreshing every 5s</span>
+    </div>
+    <div class="table-wrap">
+      <table id="tunnels-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Subdomain / Port</th>
+            <th>Local Port</th>
+            <th>Token</th>
+            <th>Uptime</th>
+            <th>In / Out</th>
+            <th id="kill-col" style="display:none">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tunnels-tbody">
+          <tr><td colspan="7" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <span id="last-updated">—</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

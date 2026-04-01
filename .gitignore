@@ -1,0 +1,52 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go
+vendor/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment / Secrets
+.env
+.env.*
+*.pem
+*.key
+server.yaml
+
+# Built server binary (root level)
+/htn-server
+/htn-nginx.conf
+
+# Cert storage (local dev)
+/certs/
+
+# Test
+*.test
+coverage.out
+coverage.html
+
+# GoReleaser
+dist/
+
+# Plans (keep structure, ignore reports)
+plans/reports/*.md
+!plans/reports/.gitkeep

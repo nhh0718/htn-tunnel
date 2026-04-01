@@ -1,0 +1,38 @@
+# htn-tunnel server configuration
+# Copy to server.yaml and edit before running.
+# All fields can be overridden via environment variables (HTN_* prefix).
+
+listen_addr: ":4443"
+domain: "tunnel.example.com"
+email: "admin@example.com"
+
+# Auth tokens — add one per user/client. Raw values; hashed in memory at runtime.
+# Generate with: openssl rand -hex 32
+tokens:
+  - "tok_replace_with_secure_random_token"
+
+max_tunnels_per_token: 10
+
+# Rate limiting (requests per minute)
+rate_limit: 100
+global_rate_limit: 1000
+
+# TCP tunnel port allocation range
+tcp_port_range: [10000, 65535]
+
+# TLS certificate storage (certmagic)
+cert_storage: "/var/lib/htn-tunnel/certs"
+
+# DNS-01 challenge provider for wildcard cert issuance.
+# Required for *.tunnel.example.com wildcard certificate.
+# Supported providers: cloudflare
+dns_provider: "cloudflare"
+dns_api_token: ""   # set via HTN_DNS_API_TOKEN env var
+
+# Set to true to use a self-signed certificate (local development only).
+dev_mode: false
+
+# Embedded dashboard
+dashboard_enabled: true
+dashboard_addr: ":8080"
+admin_token: ""   # set via HTN_ADMIN_TOKEN env var
