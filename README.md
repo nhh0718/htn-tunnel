@@ -214,50 +214,50 @@ htn-tunnel server:
 
 ---
 
-## Tieng Viet
+## Tiếng Việt
 
-### htn-tunnel la gi?
+### htn-tunnel là gì?
 
-Cong cu tunnel tu host — thay the ngrok/Cloudflare Tunnel. Chay server tren VPS, cai client tren may ban, expose bat ky port local nao ra internet voi URL HTTPS.
+Công cụ tunnel tự host — thay thế ngrok/Cloudflare Tunnel. Chạy server trên VPS, cài client trên máy bạn, expose bất kỳ port local nào ra internet với URL HTTPS.
 
 ```
-May ban (localhost:3000) --tunnel--> VPS cua ban --internet--> https://myapp.domain.com
+Máy bạn (localhost:3000) --tunnel--> VPS của bạn --internet--> https://myapp.domain.com
 ```
 
-### Tinh nang
+### Tính năng
 
-- **HTTP tunnels** — subdomain HTTPS (random hoac co dinh vinh vien)
-- **TCP tunnels** — forward port bat ky (database, SSH, ...)
+- **HTTP tunnels** — subdomain HTTPS (random hoặc cố định vĩnh viễn)
+- **TCP tunnels** — forward port bất kỳ (database, SSH, ...)
 - **Auto-TLS** — wildcard Let's Encrypt cert qua DNS-01 (Cloudflare)
-- **WebSocket** — proxy day du, ho tro HMR (Next.js, Vite, ...)
-- **API key** — user tu dang ky qua dashboard
-- **Subdomain co dinh** — claim 1 lan, dung mai mai
-- **User dashboard** — dang ky, dang nhap, quan ly subdomain
-- **Admin dashboard** — quan ly users, tunnels, sua config server
-- **Tu dong ket noi lai** — heartbeat + exponential backoff
-- **Single binary** — khong can cai them gi, chay moi nen tang
+- **WebSocket** — proxy đầy đủ, hỗ trợ HMR (Next.js, Vite, ...)
+- **API key** — người dùng tự đăng ký qua dashboard
+- **Subdomain cố định** — claim 1 lần, dùng mãi mãi
+- **User dashboard** — đăng ký, đăng nhập, quản lý subdomain
+- **Admin dashboard** — quản lý users, tunnels, sửa config server
+- **Tự động kết nối lại** — heartbeat + exponential backoff
+- **Single binary** — không cần cài thêm gì, chạy mọi nền tảng
 
 ---
 
-### Huong dan su dung (tung buoc)
+### Hướng dẫn sử dụng (từng bước)
 
-#### Buoc 1: Cai client
+#### Bước 1: Cài client
 
-Chon 1 trong 3 cach:
+Chọn 1 trong 3 cách:
 
-**Cach A: Go install** (neu da cai Go)
+**Cách A: Go install** (nếu đã cài Go)
 
 ```bash
 go install github.com/nhh0718/htn-tunnel/cmd/htn-tunnel@latest
 ```
 
-**Cach B: npm** (neu da cai Node.js)
+**Cách B: npm** (nếu đã cài Node.js)
 
 ```bash
 npm install -g htn-tunnel
 ```
 
-**Cach C: Tai binary** tu [GitHub Releases](https://github.com/nhh0718/htn-tunnel/releases)
+**Cách C: Tải binary** từ [GitHub Releases](https://github.com/nhh0718/htn-tunnel/releases)
 
 ```bash
 # Linux
@@ -268,40 +268,40 @@ sudo mv htn-tunnel /usr/local/bin/
 curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-tunnel_darwin_arm64.tar.gz | tar xz
 sudo mv htn-tunnel /usr/local/bin/
 
-# Windows — tai file .zip tu trang Releases, giai nen, them vao PATH
+# Windows — tải file .zip từ trang Releases, giải nén, thêm vào PATH
 ```
 
-#### Buoc 2: Dang ky tai khoan
+#### Bước 2: Đăng ký tài khoản
 
-Mo dashboard tren browser:
+Mở dashboard trong trình duyệt:
 
 ```
-https://<dia-chi-server>:1807/_dashboard/
+https://dashboard.33.id.vn/_dashboard/
 ```
 
-1. Nhan **Register**
-2. Nhap **ten** va **subdomain** muon dung (vi du: `myapp`)
-3. Nhan **Create Account**
-4. **Copy API key** (bat dau bang `htk_...`) — luu lai can than!
+1. Nhấn **Register**
+2. Nhập **tên** và **subdomain** muốn dùng (ví dụ: `myapp`)
+3. Nhấn **Create Account**
+4. **Copy API key** (bắt đầu bằng `htk_...`) — lưu lại cẩn thận!
 
-> Chi can dang ky 1 lan. Subdomain cua ban duoc giu vinh vien.
+> Chỉ cần đăng ký 1 lần. Subdomain của bạn được giữ vĩnh viễn.
 
-#### Buoc 3: Luu API key
+#### Bước 3: Lưu API key
 
 ```bash
-htn-tunnel auth htk_key_cua_ban --server 33.id.vn:4443
+htn-tunnel auth htk_key_của_bạn --server 33.id.vn:4443
 ```
 
-Key duoc luu vao `~/.htn-tunnel/config.yaml`. Chi can lam 1 lan.
+Key được lưu vào `~/.htn-tunnel/config.yaml`. Chỉ cần làm 1 lần.
 
-#### Buoc 4: Mo tunnel
+#### Bước 4: Mở tunnel
 
 ```bash
 # Expose web server local port 3000
 htn-tunnel http 3000 --subdomain myapp
 ```
 
-Ket qua:
+Kết quả:
 ```
 htn-tunnel vdev
 
@@ -309,67 +309,67 @@ htn-tunnel vdev
   Status:    connected
 ```
 
-Mo `https://myapp.33.id.vn` tren browser — hien thi app local cua ban!
+Mở `https://myapp.33.id.vn` trên trình duyệt — hiển thị app local của bạn!
 
-#### Buoc 5: (Tuy chon) TCP tunnel
+#### Bước 5: (Tùy chọn) TCP tunnel
 
 ```bash
 # Expose PostgreSQL port 5432
 htn-tunnel tcp 5432
 ```
 
-Ket noi tu bat ky dau: `psql -h 33.id.vn -p 34567 -U postgres`
+Kết nối từ bất kỳ đâu: `psql -h 33.id.vn -p 34567 -U postgres`
 
 ---
 
-### Quan ly tai khoan
+### Quản lý tài khoản
 
 #### Dashboard
 
-Mo `https://<server>:1807/_dashboard/` va dang nhap bang API key de:
+Mở `https://dashboard.33.id.vn/_dashboard/` và đăng nhập bằng API key để:
 - Xem subdomain (online/offline)
-- Them hoac xoa subdomain
-- Xem thong ke tunnel (uptime, bandwidth)
-- Copy lenh quick-start
+- Thêm hoặc xóa subdomain
+- Xem thống kê tunnel (uptime, bandwidth)
+- Copy lệnh quick-start
 
 #### CLI
 
 ```bash
-htn-tunnel status    # Xem thong tin tai khoan, subdomain
+htn-tunnel status    # Xem thông tin tài khoản, subdomain
 ```
 
 ---
 
-### Huong dan su dung CLI
+### Hướng dẫn sử dụng CLI
 
-| Lenh | Mo ta |
+| Lệnh | Mô tả |
 |------|-------|
-| `htn-tunnel http <port>` | Tao HTTP tunnel toi localhost:port |
-| `htn-tunnel tcp <port>` | Tao TCP tunnel toi localhost:port |
-| `htn-tunnel auth <token>` | Luu API key vao config |
-| `htn-tunnel status` | Xem thong tin tai khoan |
+| `htn-tunnel http <port>` | Tạo HTTP tunnel tới localhost:port |
+| `htn-tunnel tcp <port>` | Tạo TCP tunnel tới localhost:port |
+| `htn-tunnel auth <token>` | Lưu API key vào config |
+| `htn-tunnel status` | Xem thông tin tài khoản |
 
 **Flags:**
 
-| Flag | Mo ta |
+| Flag | Mô tả |
 |------|-------|
-| `--subdomain <ten>` | Yeu cau subdomain co dinh (chi HTTP) |
-| `--server <host:port>` | Dia chi server |
+| `--subdomain <tên>` | Yêu cầu subdomain cố định (chỉ HTTP) |
+| `--server <host:port>` | Địa chỉ server |
 | `--token <key>` | Override auth token |
 
 ---
 
-### Cai dat Server (cho admin VPS)
+### Cài đặt Server (cho admin VPS)
 
-Xem [Deployment Guide](docs/deployment-guide.md) chi tiet.
+Xem [Deployment Guide](docs/deployment-guide.md) chi tiết.
 
-**Admin dashboard:** `https://<server>:1807/_admin/` — dang nhap bang admin key de quan ly users, tunnels, config.
+**Admin dashboard:** `https://dashboard.33.id.vn/_admin/` — đăng nhập bằng admin key để quản lý users, tunnels, config.
 
-### Tai lieu
+### Tài liệu
 
-- [Deployment Guide](docs/deployment-guide.md) — Huong dan deploy VPS day du
-- [Publish Guide](docs/publish-guide.md) — Huong dan publish npm + GitHub Releases
-- [Commands Reference](docs/commands.md) — Tat ca lenh quan tri VPS
+- [Deployment Guide](docs/deployment-guide.md) — Hướng dẫn deploy VPS đầy đủ
+- [Publish Guide](docs/publish-guide.md) — Hướng dẫn publish npm + GitHub Releases
+- [Commands Reference](docs/commands.md) — Tất cả lệnh quản trị VPS
 
 ### License
 
