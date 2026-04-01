@@ -15,99 +15,178 @@ Self-hosted tunneling tool — expose localhost to the internet via a public VPS
 
 ### What is htn-tunnel?
 
-A self-hosted alternative to ngrok/Cloudflare Tunnel. HTTP subdomain routing, raw TCP port forwarding, auto-TLS via Let's Encrypt, API key management, user/admin dashboards.
+A self-hosted alternative to ngrok/Cloudflare Tunnel. Run the server on your VPS, install the client on your machine, and expose any local port to the internet with a public HTTPS URL.
 
-```bash
-htn-tunnel http 3000           # https://yourname.33.id.vn
-htn-tunnel http 3000 --subdomain myapp   # https://myapp.33.id.vn (permanent)
-htn-tunnel tcp 5432            # tcp://server:34567
+```
+You (localhost:3000) --tunnel--> Your VPS --internet--> https://myapp.your-domain.com
 ```
 
 ### Features
 
-- **HTTP tunnels** — HTTPS subdomain routing (random or fixed per user)
-- **TCP tunnels** — raw port forwarding for any TCP service
+- **HTTP tunnels** — HTTPS subdomain routing (random or permanent per user)
+- **TCP tunnels** — raw port forwarding for any TCP service (databases, SSH, etc.)
 - **Auto-TLS** — wildcard Let's Encrypt cert via DNS-01 (Cloudflare)
-- **WebSocket support** — full proxy with Origin rewrite (HMR, dev servers)
-- **API key management** — self-service registration, fixed subdomains per key
-- **User dashboard** — register, login, manage subdomains at `/_dashboard/`
-- **Admin dashboard** — manage users, tunnels, server config at `/_admin/`
+- **WebSocket support** — full proxy with Origin rewrite (Next.js HMR, dev servers)
+- **API key management** — self-service registration via web dashboard
+- **Fixed subdomains** — claim a subdomain, it's permanently yours
+- **User dashboard** — register, login, manage subdomains
+- **Admin dashboard** — manage users, tunnels, edit server config
 - **Auto-reconnect** — heartbeat keepalive + exponential backoff
-- **Single binary** — no runtime dependencies
+- **Single binary** — no runtime dependencies, cross-platform
 
-### Install Client
+---
 
-#### npm (recommended)
+### Getting Started (Step by Step)
 
-```bash
-npm install -g htn-tunnel
-```
+#### Step 1: Install the client
 
-#### GitHub Releases
+Choose one method:
 
-Download from [Releases](https://github.com/nhh0718/htn-tunnel/releases):
-
-```bash
-# Linux
-curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-tunnel_linux_amd64.tar.gz | tar xz
-sudo mv htn-tunnel /usr/local/bin/
-
-# macOS
-curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-tunnel_darwin_arm64.tar.gz | tar xz
-sudo mv htn-tunnel /usr/local/bin/
-
-# Windows — download .zip from Releases page
-```
-
-#### Go install
+**Option A: Go install** (if you have Go installed)
 
 ```bash
 go install github.com/nhh0718/htn-tunnel/cmd/htn-tunnel@latest
 ```
 
-### Quick Start
+**Option B: npm** (if you have Node.js installed)
 
 ```bash
-# 1. Register (get API key + claim subdomain)
-#    Open https://your-server:1807/_dashboard/ in browser
-#    Or use the CLI:
-htn-tunnel auth <your-api-key> --server your-server:4443
-
-# 2. Create tunnel
-htn-tunnel http 3000 --subdomain myapp
-# => https://myapp.your-domain.com -> localhost:3000
+npm install -g htn-tunnel
 ```
+
+**Option C: Download binary** from [GitHub Releases](https://github.com/nhh0718/htn-tunnel/releases)
+
+```bash
+# Linux (amd64)
+curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-tunnel_linux_amd64.tar.gz | tar xz
+sudo mv htn-tunnel /usr/local/bin/
+
+# macOS (Apple Silicon)
+curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-tunnel_darwin_arm64.tar.gz | tar xz
+sudo mv htn-tunnel /usr/local/bin/
+
+# Windows — download .zip from the Releases page and add to PATH
+```
+
+#### Step 2: Register an account
+
+Open the dashboard in your browser:
+
+```
+https://<server-address>:1807/_dashboard/
+```
+
+1. Click **Register**
+2. Enter your **name** and desired **subdomain** (e.g. `myapp`)
+3. Click **Create Account**
+4. **Copy your API key** (starts with `htk_...`) — save it somewhere safe!
+
+> You only need to register once. Your subdomain is permanently reserved.
+
+#### Step 3: Save your API key
+
+```bash
+htn-tunnel auth htk_your_key_here --server your-server:4443
+```
+
+This saves the key to `~/.htn-tunnel/config.yaml`. You only need to do this once.
+
+#### Step 4: Start a tunnel
+
+```bash
+# Expose a local web server on port 3000
+htn-tunnel http 3000 --subdomain myapp
+```
+
+Output:
+```
+htn-tunnel vdev
+
+  Tunnel:    https://myapp.your-domain.com -> localhost:3000
+  Status:    connected
+```
+
+Open `https://myapp.your-domain.com` in your browser — it shows your local app!
+
+#### Step 5: (Optional) TCP tunnel
+
+```bash
+# Expose PostgreSQL on port 5432
+htn-tunnel tcp 5432
+```
+
+Output:
+```
+  Tunnel:    tcp://remote:34567 -> localhost:5432
+  Status:    connected
+```
+
+Connect from anywhere: `psql -h your-server -p 34567 -U postgres`
+
+---
+
+### Managing Your Account
+
+#### Dashboard
+
+Open `https://<server>:1807/_dashboard/` and login with your API key to:
+- View your subdomains (online/offline status)
+- Add or remove subdomains
+- See active tunnel stats (uptime, bandwidth)
+- Copy quick-start commands
+
+#### CLI status
+
+```bash
+htn-tunnel status
+```
+
+Shows your account info, owned subdomains, and server connection.
+
+---
 
 ### CLI Reference
 
-```
-htn-tunnel http <port> [flags]    Create HTTP tunnel
-  --subdomain string              Request a fixed subdomain
-  --server string                 Server address (host:port)
-  --token string                  Override auth token
+| Command | Description |
+|---------|-------------|
+| `htn-tunnel http <port>` | Create HTTP tunnel to localhost:port |
+| `htn-tunnel tcp <port>` | Create TCP tunnel to localhost:port |
+| `htn-tunnel auth <token>` | Save API key to config |
+| `htn-tunnel status` | Show account info |
 
-htn-tunnel tcp <port> [flags]     Create TCP tunnel
+**Flags:**
 
-htn-tunnel auth <token> [flags]   Save auth token to config
-  --server string                 Save server address
+| Flag | Description |
+|------|-------------|
+| `--subdomain <name>` | Request a fixed subdomain (HTTP only) |
+| `--server <host:port>` | Override server address |
+| `--token <key>` | Override auth token |
 
-htn-tunnel status                 Show account info and subdomains
-```
+---
 
-### Server Setup
+### Server Setup (for VPS admins)
 
-See [Deployment Guide](docs/deployment-guide.md) for full VPS setup instructions.
+See the full [Deployment Guide](docs/deployment-guide.md) for:
+- VPS requirements and setup
+- DNS configuration (Cloudflare)
+- nginx coexistence (stream SNI routing)
+- systemd service
+- TLS certificate management
 
+Quick overview:
 ```bash
-# Build server
+# Build
 GOOS=linux GOARCH=amd64 go build -o htn-server ./cmd/server
 
-# Upload to VPS
+# Upload + configure
 scp htn-server root@your-vps:/usr/local/bin/
+# Edit /etc/htn-tunnel/server.yaml — see deployment guide
 
-# Configure and start
-# See docs/deployment-guide.md for server.yaml, systemd, nginx, DNS setup
+# Start
+systemctl enable --now htn-tunnel
 ```
+
+**Admin dashboard:** `https://<server>:1807/_admin/` — login with admin key to manage users, tunnels, and server config.
 
 ### Architecture
 
@@ -117,11 +196,17 @@ Internet -> Port 443 (nginx stream, SNI routing)
 |-- * (default)   -> nginx:4430 (other sites)
 
 htn-tunnel server:
-  :4443  Control plane (yamux, client auth)
+  :4443  Control plane (client connections, yamux)
   :8443  HTTP tunnel proxy (certmagic wildcard TLS)
   :8444  HTTP redirect
-  :1807  Dashboard (user + admin)
+  :1807  Dashboard (user /_dashboard/ + admin /_admin/)
 ```
+
+### Documentation
+
+- [Deployment Guide](docs/deployment-guide.md) — Full VPS setup
+- [Publish Guide](docs/publish-guide.md) — npm + GitHub Releases publishing
+- [Commands Reference](docs/commands.md) — All VPS management commands
 
 ### License
 
@@ -133,37 +218,46 @@ htn-tunnel server:
 
 ### htn-tunnel la gi?
 
-Cong cu tunnel tu host — thay the ngrok/Cloudflare Tunnel. Expose localhost ra internet qua VPS cua ban.
+Cong cu tunnel tu host — thay the ngrok/Cloudflare Tunnel. Chay server tren VPS, cai client tren may ban, expose bat ky port local nao ra internet voi URL HTTPS.
 
-```bash
-htn-tunnel http 3000           # https://tenban.33.id.vn
-htn-tunnel http 3000 --subdomain myapp   # https://myapp.33.id.vn (co dinh)
-htn-tunnel tcp 5432            # tcp://server:34567
+```
+May ban (localhost:3000) --tunnel--> VPS cua ban --internet--> https://myapp.domain.com
 ```
 
 ### Tinh nang
 
-- **HTTP tunnels** — subdomain HTTPS (random hoac co dinh theo user)
+- **HTTP tunnels** — subdomain HTTPS (random hoac co dinh vinh vien)
 - **TCP tunnels** — forward port bat ky (database, SSH, ...)
 - **Auto-TLS** — wildcard Let's Encrypt cert qua DNS-01 (Cloudflare)
-- **WebSocket** — proxy day du (HMR, dev servers)
-- **API key** — user tu dang ky, co dinh subdomain rieng
-- **User dashboard** — dang ky, dang nhap, quan ly subdomain tai `/_dashboard/`
-- **Admin dashboard** — quan ly users, tunnels, config tai `/_admin/`
-- **Auto-reconnect** — heartbeat + exponential backoff
-- **Single binary** — khong can cai them gi
+- **WebSocket** — proxy day du, ho tro HMR (Next.js, Vite, ...)
+- **API key** — user tu dang ky qua dashboard
+- **Subdomain co dinh** — claim 1 lan, dung mai mai
+- **User dashboard** — dang ky, dang nhap, quan ly subdomain
+- **Admin dashboard** — quan ly users, tunnels, sua config server
+- **Tu dong ket noi lai** — heartbeat + exponential backoff
+- **Single binary** — khong can cai them gi, chay moi nen tang
 
-### Cai dat Client
+---
 
-#### npm (khuyen nghi)
+### Huong dan su dung (tung buoc)
+
+#### Buoc 1: Cai client
+
+Chon 1 trong 3 cach:
+
+**Cach A: Go install** (neu da cai Go)
+
+```bash
+go install github.com/nhh0718/htn-tunnel/cmd/htn-tunnel@latest
+```
+
+**Cach B: npm** (neu da cai Node.js)
 
 ```bash
 npm install -g htn-tunnel
 ```
 
-#### GitHub Releases
-
-Tai tu [Releases](https://github.com/nhh0718/htn-tunnel/releases):
+**Cach C: Tai binary** tu [GitHub Releases](https://github.com/nhh0718/htn-tunnel/releases)
 
 ```bash
 # Linux
@@ -174,53 +268,108 @@ sudo mv htn-tunnel /usr/local/bin/
 curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-tunnel_darwin_arm64.tar.gz | tar xz
 sudo mv htn-tunnel /usr/local/bin/
 
-# Windows — tai file .zip tu trang Releases
+# Windows — tai file .zip tu trang Releases, giai nen, them vao PATH
 ```
 
-#### Go install
+#### Buoc 2: Dang ky tai khoan
 
-```bash
-go install github.com/nhh0718/htn-tunnel/cmd/htn-tunnel@latest
+Mo dashboard tren browser:
+
+```
+https://<dia-chi-server>:1807/_dashboard/
 ```
 
-### Bat dau nhanh
+1. Nhan **Register**
+2. Nhap **ten** va **subdomain** muon dung (vi du: `myapp`)
+3. Nhan **Create Account**
+4. **Copy API key** (bat dau bang `htk_...`) — luu lai can than!
+
+> Chi can dang ky 1 lan. Subdomain cua ban duoc giu vinh vien.
+
+#### Buoc 3: Luu API key
 
 ```bash
-# 1. Dang ky (lay API key + claim subdomain)
-#    Mo https://your-server:1807/_dashboard/ tren browser
-#    Hoac dung CLI:
-htn-tunnel auth <api-key-cua-ban> --server 33.id.vn:4443
+htn-tunnel auth htk_key_cua_ban --server 33.id.vn:4443
+```
 
-# 2. Tao tunnel
+Key duoc luu vao `~/.htn-tunnel/config.yaml`. Chi can lam 1 lan.
+
+#### Buoc 4: Mo tunnel
+
+```bash
+# Expose web server local port 3000
 htn-tunnel http 3000 --subdomain myapp
-# => https://myapp.33.id.vn -> localhost:3000
 ```
+
+Ket qua:
+```
+htn-tunnel vdev
+
+  Tunnel:    https://myapp.33.id.vn -> localhost:3000
+  Status:    connected
+```
+
+Mo `https://myapp.33.id.vn` tren browser — hien thi app local cua ban!
+
+#### Buoc 5: (Tuy chon) TCP tunnel
+
+```bash
+# Expose PostgreSQL port 5432
+htn-tunnel tcp 5432
+```
+
+Ket noi tu bat ky dau: `psql -h 33.id.vn -p 34567 -U postgres`
+
+---
+
+### Quan ly tai khoan
+
+#### Dashboard
+
+Mo `https://<server>:1807/_dashboard/` va dang nhap bang API key de:
+- Xem subdomain (online/offline)
+- Them hoac xoa subdomain
+- Xem thong ke tunnel (uptime, bandwidth)
+- Copy lenh quick-start
+
+#### CLI
+
+```bash
+htn-tunnel status    # Xem thong tin tai khoan, subdomain
+```
+
+---
 
 ### Huong dan su dung CLI
 
-```
-htn-tunnel http <port> [flags]    Tao HTTP tunnel
-  --subdomain string              Yeu cau subdomain co dinh
-  --server string                 Dia chi server (host:port)
-  --token string                  Override auth token
+| Lenh | Mo ta |
+|------|-------|
+| `htn-tunnel http <port>` | Tao HTTP tunnel toi localhost:port |
+| `htn-tunnel tcp <port>` | Tao TCP tunnel toi localhost:port |
+| `htn-tunnel auth <token>` | Luu API key vao config |
+| `htn-tunnel status` | Xem thong tin tai khoan |
 
-htn-tunnel tcp <port> [flags]     Tao TCP tunnel
+**Flags:**
 
-htn-tunnel auth <token> [flags]   Luu auth token vao config
-  --server string                 Luu dia chi server
+| Flag | Mo ta |
+|------|-------|
+| `--subdomain <ten>` | Yeu cau subdomain co dinh (chi HTTP) |
+| `--server <host:port>` | Dia chi server |
+| `--token <key>` | Override auth token |
 
-htn-tunnel status                 Xem thong tin tai khoan va subdomain
-```
+---
 
-### Cai dat Server
+### Cai dat Server (cho admin VPS)
 
-Xem [Deployment Guide](docs/deployment-guide.md) de biet chi tiet cai dat VPS.
+Xem [Deployment Guide](docs/deployment-guide.md) chi tiet.
+
+**Admin dashboard:** `https://<server>:1807/_admin/` — dang nhap bang admin key de quan ly users, tunnels, config.
 
 ### Tai lieu
 
-- [Deployment Guide](docs/deployment-guide.md) — Huong dan deploy len VPS
+- [Deployment Guide](docs/deployment-guide.md) — Huong dan deploy VPS day du
 - [Publish Guide](docs/publish-guide.md) — Huong dan publish npm + GitHub Releases
-- [Commands Reference](docs/commands.md) — Tat ca lenh tren VPS
+- [Commands Reference](docs/commands.md) — Tat ca lenh quan tri VPS
 
 ### License
 
