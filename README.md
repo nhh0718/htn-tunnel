@@ -4,7 +4,7 @@
     Self-hosted tunnel — expose localhost to the internet
     <br />
     <a href="#-quick-start"><strong>Quick Start</strong></a> &middot;
-    <a href="#-hướng-dẫn-nhanh"><strong>Tiếng Việt</strong></a> &middot;
+    <a href="#tiếng-việt"><strong>Tiếng Việt</strong></a> &middot;
     <a href="https://dashboard.33.id.vn/_dashboard/">Dashboard</a> &middot;
     <a href="docs/deployment-guide.md">Deploy Guide</a>
   </p>
@@ -211,6 +211,7 @@ scp htn-server root@your-vps:/usr/local/bin/
 
 <br>
 
+<a id="tiếng-việt"></a>
 <h1 align="center">htn-tunnel <sub><sup>Tiếng Việt</sup></sub></h1>
 
 <p align="center">Công cụ tunnel tự host — expose localhost ra internet qua VPS của bạn</p>
