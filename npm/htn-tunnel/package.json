@@ -1,6 +1,6 @@
 {
   "name": "htn-tunnel",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Self-hosted tunnel client — expose localhost to the internet",
   "bin": {
     "htn-tunnel": "./bin/htn-tunnel.js"
