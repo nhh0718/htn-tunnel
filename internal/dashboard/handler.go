@@ -104,6 +104,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) registerRoutes() {
 	// --- User Dashboard API ---
+	h.mux.HandleFunc("GET /_dashboard/api/info", h.handlePublicInfo)
 	h.mux.HandleFunc("POST /_dashboard/api/register", h.handleRegister)
 	h.mux.HandleFunc("POST /_dashboard/api/login", h.handleLogin)
 	h.mux.HandleFunc("GET /_dashboard/api/me", h.userAuth(h.handleMe))
@@ -128,6 +129,12 @@ func (h *Handler) registerRoutes() {
 }
 
 // --- User API Handlers ---
+
+func (h *Handler) handlePublicInfo(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]any{
+		"domain": h.domain,
+	})
+}
 
 func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	var req struct {

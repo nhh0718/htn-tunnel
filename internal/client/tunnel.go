@@ -83,6 +83,7 @@ type AccountInfo struct {
 	Name       string   `json:"name"`
 	Subdomains []string `json:"subdomains"`
 	MaxTunnels int      `json:"max_tunnels"`
+	Domain     string   `json:"domain"`
 }
 
 // GetAccountInfo queries the server for the current key's account details.

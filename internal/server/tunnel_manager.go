@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/yamux"
 	"github.com/nhh0718/htn-tunnel/internal/dashboard"
+	"github.com/nhh0718/htn-tunnel/internal/protocol"
 )
 
 // subdomainRe validates subdomain labels: lowercase alphanumeric + hyphens,
@@ -32,6 +33,7 @@ type TunnelSession struct {
 	LocalPort  int             // client's local port
 	Session    *yamux.Session  // yamux session to client
 	Listener   net.Listener    // TCP tunnels: port listener
+	ControlEnc *protocol.Encoder // control stream encoder for sending request logs
 	CreatedAt  time.Time
 	BytesIn    int64           // atomic via sync/atomic in proxy wrappers
 	BytesOut   int64

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/nhh0718/htn-tunnel/internal/client"
@@ -38,17 +39,23 @@ func main() {
 	}
 }
 
-// httpCmd implements: htn-tunnel http <port> [--subdomain name]
+// httpCmd implements: htn-tunnel http <port>[:<subdomain>]
 func httpCmd() *cobra.Command {
 	var subdomain string
 	cmd := &cobra.Command{
-		Use:   "http <port>",
+		Use:   "http <port>[:<subdomain>]",
 		Short: "Create an HTTP tunnel to localhost:<port>",
+		Long:  "Create an HTTP tunnel.\n\nExamples:\n  htn-tunnel http 3000          # interactive subdomain picker\n  htn-tunnel http 3000:myapp    # fixed subdomain\n  htn-tunnel http 8080:dev",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			localPort, err := parsePort(args[0])
+			localPort, sub, err := parsePortSubdomain(args[0])
 			if err != nil {
 				return err
+			}
+
+			// --subdomain flag as fallback (backward compat)
+			if sub == "" && subdomain != "" {
+				sub = subdomain
 			}
 
 			cfg, err := loadClientCfg()
@@ -59,16 +66,142 @@ func httpCmd() *cobra.Command {
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 
-			printBanner(version, "connecting...")
-			fmt.Printf("  Server:    %s\n", cfg.ServerAddr)
-			fmt.Printf("  Ctrl+C to disconnect\n\n")
+			// If no subdomain specified, try interactive picker.
+			if sub == "" {
+				resolved, err := pickSubdomain(ctx, cfg)
+				if err != nil {
+					return err
+				}
+				sub = resolved
+			} else {
+				// Validate subdomain is owned by this key.
+				if err := validateSubdomain(ctx, cfg, sub); err != nil {
+					resolved, pickErr := handleSubdomainError(ctx, cfg, sub, err)
+					if pickErr != nil {
+						return pickErr
+					}
+					sub = resolved
+				}
+			}
 
-			r := client.NewReconnector(cfg, "http", localPort, subdomain)
+			r := client.NewReconnector(cfg, "http", localPort, sub, version)
 			return r.Run(ctx)
 		},
 	}
-	cmd.Flags().StringVar(&subdomain, "subdomain", "", "request a specific subdomain")
+	cmd.Flags().StringVar(&subdomain, "subdomain", "", "(deprecated) use port:subdomain syntax instead")
 	return cmd
+}
+
+// parsePortSubdomain parses "3000:hoang" → (3000, "hoang") or "3000" → (3000, "").
+func parsePortSubdomain(arg string) (int, string, error) {
+	parts := strings.SplitN(arg, ":", 2)
+	p, err := strconv.Atoi(parts[0])
+	if err != nil || p < 1 || p > 65535 {
+		return 0, "", fmt.Errorf("invalid port %q (must be 1-65535)", parts[0])
+	}
+	sub := ""
+	if len(parts) == 2 && parts[1] != "" {
+		sub = strings.ToLower(parts[1])
+	}
+	return p, sub, nil
+}
+
+// pickSubdomain connects to server, gets owned subdomains, presents interactive picker.
+func pickSubdomain(ctx context.Context, cfg *config.ClientConfig) (string, error) {
+	c := client.NewClient(cfg)
+	if err := c.Connect(ctx); err != nil {
+		return "", nil // can't connect for picker, use random
+	}
+	info, err := c.GetAccountInfo()
+	c.Close()
+	if err != nil || len(info.Subdomains) == 0 {
+		return "", nil // no subdomains, use random
+	}
+
+	domain := info.Domain
+	if domain == "" {
+		host, _, _ := strings.Cut(cfg.ServerAddr, ":")
+		domain = host
+	}
+
+	fmt.Println("\n  Chọn subdomain:\n")
+	for i, sub := range info.Subdomains {
+		fmt.Printf("  [%d] %s.%s\n", i+1, sub, domain)
+	}
+	fmt.Printf("  [%d] Subdomain ngẫu nhiên\n\n", len(info.Subdomains)+1)
+	fmt.Printf("  Nhập số (1-%d): ", len(info.Subdomains)+1)
+
+	var choice int
+	fmt.Scan(&choice)
+	fmt.Println()
+
+	if choice >= 1 && choice <= len(info.Subdomains) {
+		return info.Subdomains[choice-1], nil
+	}
+	return "", nil // random
+}
+
+// validateSubdomain checks if subdomain is owned by the current key.
+func validateSubdomain(ctx context.Context, cfg *config.ClientConfig, sub string) error {
+	c := client.NewClient(cfg)
+	if err := c.Connect(ctx); err != nil {
+		return nil // can't validate, let server handle it
+	}
+	info, err := c.GetAccountInfo()
+	c.Close()
+	if err != nil {
+		return nil
+	}
+	for _, s := range info.Subdomains {
+		if s == sub {
+			return nil // owned
+		}
+	}
+	return fmt.Errorf("subdomain \"%s\" không thuộc tài khoản của bạn", sub)
+}
+
+// handleSubdomainError shows error and presents fallback options.
+func handleSubdomainError(ctx context.Context, cfg *config.ClientConfig, requested string, origErr error) (string, error) {
+	c := client.NewClient(cfg)
+	if err := c.Connect(ctx); err != nil {
+		return "", origErr
+	}
+	info, err := c.GetAccountInfo()
+	c.Close()
+	if err != nil || len(info.Subdomains) == 0 {
+		return "", origErr
+	}
+
+	domain := info.Domain
+	if domain == "" {
+		host, _, _ := strings.Cut(cfg.ServerAddr, ":")
+		domain = host
+	}
+
+	fmt.Printf("\n  ✗ Subdomain \"%s\" không thuộc tài khoản của bạn.\n\n", requested)
+	fmt.Println("  Subdomain của bạn:")
+	for _, sub := range info.Subdomains {
+		fmt.Printf("    %s.%s\n", sub, domain)
+	}
+	fmt.Println()
+	for i, sub := range info.Subdomains {
+		fmt.Printf("  [%d] Dùng %s\n", i+1, sub)
+	}
+	fmt.Printf("  [%d] Subdomain ngẫu nhiên\n", len(info.Subdomains)+1)
+	fmt.Printf("  [%d] Hủy\n\n", len(info.Subdomains)+2)
+	fmt.Printf("  Nhập số (1-%d): ", len(info.Subdomains)+2)
+
+	var choice int
+	fmt.Scan(&choice)
+	fmt.Println()
+
+	if choice == len(info.Subdomains)+2 {
+		return "", fmt.Errorf("cancelled")
+	}
+	if choice >= 1 && choice <= len(info.Subdomains) {
+		return info.Subdomains[choice-1], nil
+	}
+	return "", nil // random
 }
 
 // tcpCmd implements: htn-tunnel tcp <port>
@@ -95,7 +228,7 @@ func tcpCmd() *cobra.Command {
 			fmt.Printf("  Server:    %s\n", cfg.ServerAddr)
 			fmt.Printf("  Ctrl+C to disconnect\n\n")
 
-			r := client.NewReconnector(cfg, "tcp", localPort, "")
+			r := client.NewReconnector(cfg, "tcp", localPort, "", version)
 			return r.Run(ctx)
 		},
 	}

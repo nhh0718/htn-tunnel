@@ -24,6 +24,7 @@ const (
 	MsgRegisterResp    MsgType = 0x0B
 	MsgAccountInfo     MsgType = 0x0E
 	MsgAccountInfoResp MsgType = 0x0F
+	MsgRequestLog      MsgType = 0x10
 )
 
 // AuthMsg is sent by the client as the first message on a control connection.
@@ -81,4 +82,14 @@ type AccountInfoRespMsg struct {
 	Name       string   `json:"name"`
 	Subdomains []string `json:"subdomains"`
 	MaxTunnels int      `json:"max_tunnels"`
+	Domain     string   `json:"domain,omitempty"`
+}
+
+// RequestLogMsg is sent from server to client for each proxied request.
+type RequestLogMsg struct {
+	Method   string `json:"m"`
+	Path     string `json:"p"`
+	Status   int    `json:"s"`
+	Duration int    `json:"d"` // milliseconds
+	Size     int64  `json:"z"` // response bytes
 }

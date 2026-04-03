@@ -15,8 +15,9 @@ import (
 	"time"
 
 	"github.com/caddyserver/certmagic"
-	"github.com/nhh0718/htn-tunnel/internal/config"
 	"github.com/libdns/cloudflare"
+	"github.com/nhh0718/htn-tunnel/internal/config"
+	"github.com/nhh0718/htn-tunnel/internal/protocol"
 )
 
 // HTTPProxy handles TLS termination, SNI-based subdomain routing, and HTTP
@@ -148,6 +149,10 @@ func (p *HTTPProxy) serveRequest(w http.ResponseWriter, r *http.Request, subdoma
 		return
 	}
 
+	// Wrap response writer to capture status code and size for request logging.
+	rw := &loggingResponseWriter{ResponseWriter: w}
+	start := time.Now()
+
 	// Standard HTTP reverse proxy via yamux stream.
 	proxy := &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
@@ -161,7 +166,10 @@ func (p *HTTPProxy) serveRequest(w http.ResponseWriter, r *http.Request, subdoma
 			http.Error(w, "tunnel error: "+err.Error(), http.StatusBadGateway)
 		},
 	}
-	proxy.ServeHTTP(w, r)
+	proxy.ServeHTTP(rw, r)
+
+	// Send request log to client via control stream.
+	sendRequestLog(ts, r.Method, r.URL.Path, rw.status, time.Since(start), rw.size)
 }
 
 // proxyWebSocket hijacks the HTTP connection and forwards raw bytes through
@@ -433,4 +441,52 @@ func (l *singleConnListener) Close() error {
 }
 
 func (l *singleConnListener) Addr() net.Addr { return l.conn.LocalAddr() }
+
+// loggingResponseWriter wraps http.ResponseWriter to capture status code and response size.
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	status int
+	size   int64
+}
+
+func (w *loggingResponseWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *loggingResponseWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = 200
+	}
+	n, err := w.ResponseWriter.Write(b)
+	w.size += int64(n)
+	return n, err
+}
+
+func (w *loggingResponseWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// sendRequestLog sends a request log message to the client's control stream.
+func sendRequestLog(ts *TunnelSession, method, path string, status int, dur time.Duration, size int64) {
+	if ts == nil || ts.ControlEnc == nil {
+		return
+	}
+	if status == 0 {
+		status = 502
+	}
+	// Truncate path for log message efficiency.
+	if len(path) > 100 {
+		path = path[:97] + "..."
+	}
+	_ = ts.ControlEnc.Encode(protocol.MsgRequestLog, protocol.RequestLogMsg{
+		Method:   method,
+		Path:     path,
+		Status:   status,
+		Duration: int(dur.Milliseconds()),
+		Size:     size,
+	})
+}
 

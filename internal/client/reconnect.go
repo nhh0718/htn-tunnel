@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -32,15 +33,17 @@ type Reconnector struct {
 	tunnelType string // "http" or "tcp"
 	localPort  int
 	subdomain  string // last known subdomain (may be reclaimed on reconnect)
+	version    string
 }
 
 // NewReconnector creates a Reconnector for the given tunnel parameters.
-func NewReconnector(cfg *config.ClientConfig, tunnelType string, localPort int, subdomain string) *Reconnector {
+func NewReconnector(cfg *config.ClientConfig, tunnelType string, localPort int, subdomain, version string) *Reconnector {
 	return &Reconnector{
 		cfg:        cfg,
 		tunnelType: tunnelType,
 		localPort:  localPort,
 		subdomain:  subdomain,
+		version:    version,
 	}
 }
 
@@ -83,18 +86,20 @@ func (r *Reconnector) Run(ctx context.Context) error {
 			continue
 		}
 
-		// Update subdomain in case server assigned a different one.
+		// Update subdomain and display box.
+		tunnel := ""
+		forward := fmt.Sprintf("localhost:%d", r.localPort)
 		if r.tunnelType == "http" && info.URL != "" {
 			r.subdomain = extractSubdomainFromURL(info.URL)
-			fmt.Printf("  Tunnel:    %s → localhost:%d\n", info.URL, r.localPort)
+			tunnel = info.URL
 		} else if r.tunnelType == "tcp" && info.RemotePort > 0 {
-			fmt.Printf("  Tunnel:    tcp://remote:%d → localhost:%d\n", info.RemotePort, r.localPort)
+			tunnel = fmt.Sprintf("tcp://remote:%d", info.RemotePort)
 		}
+		PrintBox(r.version, tunnel, forward, r.cfg.ServerAddr, "connected")
 
 		// Reset backoff on successful connect.
 		backoff = baseBackoff
 		attempt = 0
-		fmt.Println("  Status:    connected")
 
 		// Run heartbeat and serve in parallel; reconnect on either error.
 		serveErr := r.runWithHeartbeat(ctx, c)
@@ -145,55 +150,56 @@ func (r *Reconnector) runWithHeartbeat(ctx context.Context, c *Client) error {
 	}
 }
 
-// runHeartbeat sends Heartbeat messages every heartbeatInterval and waits for
-// HeartbeatAck. After maxHeartbeatMisses consecutive missed acks it returns an
-// error to trigger reconnection.
+// runHeartbeat sends heartbeats and reads control stream messages (acks + request logs).
 func (r *Reconnector) runHeartbeat(ctx context.Context, c *Client) error {
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 
 	misses := 0
 
+	// Dedicated goroutine reads all control stream messages.
+	type ctrlMsg struct {
+		msgType protocol.MsgType
+		raw     []byte
+		err     error
+	}
+	msgCh := make(chan ctrlMsg, 16)
+	go func() {
+		for {
+			mt, raw, err := c.dec.Decode()
+			msgCh <- ctrlMsg{mt, raw, err}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+
+		case msg := <-msgCh:
+			if msg.err != nil {
+				return msg.err
+			}
+			switch msg.msgType {
+			case protocol.MsgHeartbeatAck:
+				misses = 0
+			case protocol.MsgRequestLog:
+				var log protocol.RequestLogMsg
+				if err := json.Unmarshal(msg.raw, &log); err == nil {
+					PrintRequestLog(log)
+				}
+			default:
+				slog.Debug("control stream: unhandled message", "type", msg.msgType)
+			}
+
 		case <-ticker.C:
 			if err := c.enc.Encode(protocol.MsgHeartbeat, nil); err != nil {
 				return fmt.Errorf("send heartbeat: %w", err)
 			}
-
-			// Wait for ack with a short deadline.
-			ackCh := make(chan error, 1)
-			go func() {
-				msgType, _, err := c.dec.Decode()
-				if err != nil {
-					ackCh <- err
-					return
-				}
-				if msgType == protocol.MsgHeartbeatAck {
-					ackCh <- nil
-				} else {
-					// Re-process other message types (e.g. TunnelResponse from a
-					// concurrent request) — for MVP we just log and ignore.
-					slog.Debug("heartbeat goroutine received non-ack message", "type", msgType)
-					ackCh <- nil
-				}
-			}()
-
-			select {
-			case err := <-ackCh:
-				if err != nil {
-					misses++
-					slog.Warn("heartbeat ack error", "misses", misses, "err", err)
-				} else {
-					misses = 0
-				}
-			case <-time.After(heartbeatTimeout):
-				misses++
-				slog.Warn("heartbeat ack timeout", "misses", misses)
-			}
-
+			misses++
 			if misses >= maxHeartbeatMisses {
 				return fmt.Errorf("connection dead: %d consecutive missed heartbeats", misses)
 			}

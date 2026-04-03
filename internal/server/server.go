@@ -352,14 +352,14 @@ func (s *Server) handleAccountInfo(enc *protocol.Encoder, token string) {
 		k := s.keyStore.GetKey(token)
 		if k != nil {
 			_ = enc.Encode(protocol.MsgAccountInfoResp, protocol.AccountInfoRespMsg{
-				Name: k.Name, Subdomains: k.Subdomains, MaxTunnels: k.MaxTunnels,
+				Name: k.Name, Subdomains: k.Subdomains, MaxTunnels: k.MaxTunnels, Domain: s.cfg.Domain,
 			})
 			return
 		}
 	}
 	// Legacy tokens don't have account info.
 	_ = enc.Encode(protocol.MsgAccountInfoResp, protocol.AccountInfoRespMsg{
-		Name: "legacy", MaxTunnels: s.cfg.MaxTunnelsPerToken,
+		Name: "legacy", MaxTunnels: s.cfg.MaxTunnelsPerToken, Domain: s.cfg.Domain,
 	})
 }
 
@@ -405,10 +405,11 @@ func (s *Server) handleTunnelRequest(
 	}
 
 	ts := &TunnelSession{
-		Token:     token,
-		Type:      string(req.Type),
-		LocalPort: req.LocalPort,
-		Session:   session,
+		Token:      token,
+		Type:       string(req.Type),
+		LocalPort:  req.LocalPort,
+		Session:    session,
+		ControlEnc: enc,
 	}
 	// Generate a unique ID.
 	ts.ID = randomHex(8)
