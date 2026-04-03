@@ -1,29 +1,14 @@
 {
   "name": "htn-tunnel",
-  "version": "0.2.0",
+  "version": "0.2.5",
   "description": "Self-hosted tunnel client — expose localhost to the internet",
   "bin": {
     "htn-tunnel": "./bin/htn-tunnel.js"
   },
-  "optionalDependencies": {
-    "@htn-tunnel/darwin-arm64": "0.1.1",
-    "@htn-tunnel/darwin-x64": "0.1.1",
-    "@htn-tunnel/linux-arm64": "0.1.1",
-    "@htn-tunnel/linux-x64": "0.1.1",
-    "@htn-tunnel/win32-arm64": "0.1.1",
-    "@htn-tunnel/win32-x64": "0.1.1"
-  },
   "scripts": {
     "postinstall": "node lib/install.js"
   },
-  "keywords": [
-    "tunnel",
-    "ngrok",
-    "localhost",
-    "expose",
-    "dev",
-    "htn"
-  ],
+  "keywords": ["tunnel", "ngrok", "localhost", "expose", "dev", "htn"],
   "license": "MIT",
   "repository": {
     "type": "git",
