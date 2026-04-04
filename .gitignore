@@ -1,5 +1,8 @@
 # Binaries
 bin/
+# But keep npm shim script
+!npm/htn-tunnel/bin/
+!npm/htn-tunnel/bin/htn-tunnel.js
 dist/
 *.exe
 *.exe~
