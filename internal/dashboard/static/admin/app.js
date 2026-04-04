@@ -23,6 +23,7 @@ function handleLogin(e) {
 }
 
 function logout() {
+  if (adminSSE) { adminSSE.close(); adminSSE = null; }
   adminToken = '';
   sessionStorage.removeItem('htn_admin_token');
   document.getElementById('page-login').style.display = 'block';
@@ -39,6 +40,8 @@ async function loadPanel() {
     loadKeys();
     loadTunnels();
     loadConfig();
+    loadAdminTraffic();
+    startAdminLogStream();
   } catch {
     document.getElementById('login-error').textContent = 'Invalid admin key';
   }
@@ -198,6 +201,97 @@ async function refresh() {
   } catch { /* ignore */ }
 }
 
+// --- Admin Traffic Analytics ---
+let adminSSE = null;
+const MAX_ADMIN_LOG_ROWS = 300;
+
+async function loadAdminTraffic() {
+  try {
+    const [traffic, topPaths] = await Promise.all([
+      api('GET', '/stats/traffic'),
+      api('GET', '/stats/top-paths'),
+    ]);
+    renderAdminChart(traffic);
+    renderAdminStatus(traffic);
+    renderAdminTopPaths(topPaths);
+    updateAdminAnalytics(traffic);
+  } catch {}
+}
+
+function renderAdminChart(buckets) {
+  const el = document.getElementById('admin-traffic-chart');
+  if (!buckets || !buckets.length) { el.innerHTML = '<span class="empty">No data</span>'; return; }
+  const maxReqs = Math.max(...buckets.map(b => b.reqs), 1);
+  el.innerHTML = buckets.map(b => {
+    const h = Math.max(2, (b.reqs / maxReqs) * 140);
+    const t = new Date(b.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    return `<div class="chart-bar" style="height:${h}px" data-tooltip="${t}: ${b.reqs} reqs"></div>`;
+  }).join('');
+}
+
+function renderAdminStatus(buckets) {
+  const el = document.getElementById('admin-status-breakdown');
+  let s2=0, s3=0, s4=0, s5=0;
+  buckets.forEach(b => { s2+=b.s2xx; s3+=b.s3xx; s4+=b.s4xx; s5+=b.s5xx; });
+  const total = s2+s3+s4+s5 || 1;
+  const items = [
+    { label: '2xx', count: s2, color: '#4ade80' },
+    { label: '3xx', count: s3, color: '#38bdf8' },
+    { label: '4xx', count: s4, color: '#fbbf24' },
+    { label: '5xx', count: s5, color: '#f87171' },
+  ];
+  el.innerHTML = items.map(i => `
+    <div class="status-row">
+      <span class="status-dot" style="background:${i.color}"></span><span>${i.label}</span>
+      <div class="status-bar"><div class="status-bar-fill" style="width:${(i.count/total*100)}%;background:${i.color}"></div></div>
+      <span class="status-count">${i.count}</span>
+    </div>
+  `).join('');
+}
+
+function renderAdminTopPaths(paths) {
+  const el = document.getElementById('admin-top-paths');
+  if (!paths || !paths.length) { el.innerHTML = '<p class="empty">No data</p>'; return; }
+  el.innerHTML = paths.map(p =>
+    `<div class="path-row"><span class="path-name" title="${esc(p.path)}">${esc(p.path)}</span><span class="path-count">${p.count}</span></div>`
+  ).join('');
+}
+
+function updateAdminAnalytics(buckets) {
+  let totalReqs = 0, totalLatency = 0, reqsWithLatency = 0;
+  buckets.forEach(b => {
+    totalReqs += b.reqs;
+    if (b.avg_ms > 0) { totalLatency += b.avg_ms * b.reqs; reqsWithLatency += b.reqs; }
+  });
+  document.getElementById('stat-reqs').textContent = totalReqs;
+  document.getElementById('stat-latency').textContent =
+    reqsWithLatency > 0 ? Math.round(totalLatency / reqsWithLatency) + 'ms' : '0ms';
+}
+
+function startAdminLogStream() {
+  if (adminSSE) adminSSE.close();
+  adminSSE = new EventSource(ADMIN_API + '/logs/stream?key=' + encodeURIComponent(adminToken));
+  adminSSE.onmessage = (e) => {
+    try { addAdminLogRow(JSON.parse(e.data)); } catch {}
+  };
+  adminSSE.onerror = () => {
+    setTimeout(() => { if (adminToken) startAdminLogStream(); }, 5000);
+  };
+}
+
+function addAdminLogRow(log) {
+  const tbody = document.getElementById('admin-log-tbody');
+  const empty = tbody.querySelector('.empty');
+  if (empty) empty.parentElement.remove();
+  const tr = document.createElement('tr');
+  const t = new Date(log.ts).toLocaleTimeString();
+  const sc = log.s >= 500 ? 'log-s5' : log.s >= 400 ? 'log-s4' : log.s >= 300 ? 'log-s3' : 'log-s2';
+  const path = log.p.length > 30 ? log.p.slice(0, 27) + '...' : log.p;
+  tr.innerHTML = `<td>${t}</td><td>${esc(log.sub||'-')}</td><td>${esc(log.m)}</td><td title="${esc(log.p)}">${esc(path)}</td><td class="${sc}">${log.s}</td><td>${log.d}ms</td><td>${fmtBytes(log.z)}</td><td class="muted">${esc(log.tok||'-')}</td>`;
+  tbody.insertBefore(tr, tbody.firstChild);
+  while (tbody.children.length > MAX_ADMIN_LOG_ROWS) tbody.removeChild(tbody.lastChild);
+}
+
 // --- Init ---
 if (adminToken) {
   loadPanel();
@@ -208,5 +302,6 @@ setInterval(() => {
   if (adminToken && document.getElementById('page-panel').style.display !== 'none') {
     refresh();
     loadTunnels();
+    loadAdminTraffic();
   }
 }, 5000);

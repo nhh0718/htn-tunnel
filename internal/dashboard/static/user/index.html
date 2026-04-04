@@ -71,10 +71,37 @@
 
   <!-- Panel -->
   <section id="page-panel" class="page" style="display:none">
-    <div class="stats-grid">
+    <div class="stats-grid stats-5">
       <div class="stat-card"><div class="stat-value" id="stat-tunnels">0</div><div class="stat-label">Tunnels</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-reqs">0</div><div class="stat-label">Requests</div></div>
       <div class="stat-card"><div class="stat-value" id="stat-in">0B</div><div class="stat-label">Traffic ↓</div></div>
       <div class="stat-card"><div class="stat-value" id="stat-out">0B</div><div class="stat-label">Traffic ↑</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-latency">0ms</div><div class="stat-label">Avg Latency</div></div>
+    </div>
+
+    <div class="section-row">
+      <div class="section-col">
+        <h2>Traffic <span class="subtitle">30 phút gần nhất</span></h2>
+        <div class="chart-container" id="traffic-chart"></div>
+      </div>
+      <div class="section-col section-col-sm">
+        <h2>Status</h2>
+        <div class="status-breakdown" id="status-breakdown"></div>
+        <h2>Top Paths</h2>
+        <div id="top-paths"></div>
+      </div>
+    </div>
+
+    <h2>Request Log <span class="badge-live">● LIVE</span></h2>
+    <div class="log-table-wrap">
+      <table class="log-table">
+        <thead><tr>
+          <th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Duration</th><th>Size</th>
+        </tr></thead>
+        <tbody id="log-tbody">
+          <tr><td colspan="6" class="empty">Đợi request...</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <h2>Subdomain của bạn</h2>

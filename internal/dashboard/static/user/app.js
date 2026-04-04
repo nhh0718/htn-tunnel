@@ -162,6 +162,7 @@ function loginWithKey(key) {
 }
 
 function logout() {
+  if (logSSE) { logSSE.close(); logSSE = null; }
   currentKey = '';
   localStorage.removeItem('htn_key');
   showPage('landing');
@@ -180,6 +181,8 @@ async function loadPanel() {
       (me.subdomains.length ? `:${me.subdomains[0]}` : '');
     renderSubdomains(me.subdomains);
     loadTunnels();
+    loadTrafficStats();
+    startLogStream();
   } catch {
     logout();
   }
@@ -268,6 +271,98 @@ function fmtBytes(b) {
   return (b / 1048576).toFixed(1) + 'MB';
 }
 
+// --- Traffic Analytics ---
+let logSSE = null;
+const MAX_LOG_ROWS = 200;
+
+async function loadTrafficStats() {
+  try {
+    const [traffic, topPaths] = await Promise.all([
+      api('GET', '/stats/traffic'),
+      api('GET', '/stats/top-paths'),
+    ]);
+    renderTrafficChart(traffic);
+    renderStatusBreakdown(traffic);
+    renderTopPaths(topPaths);
+    updateAnalyticsStats(traffic);
+  } catch { /* ignore */ }
+}
+
+function renderTrafficChart(buckets) {
+  const el = document.getElementById('traffic-chart');
+  if (!buckets || !buckets.length) { el.innerHTML = '<span class="empty">No data</span>'; return; }
+  const maxReqs = Math.max(...buckets.map(b => b.reqs), 1);
+  el.innerHTML = buckets.map(b => {
+    const h = Math.max(2, (b.reqs / maxReqs) * 140);
+    const t = new Date(b.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    return `<div class="chart-bar" style="height:${h}px" data-tooltip="${t}: ${b.reqs} reqs"></div>`;
+  }).join('');
+}
+
+function renderStatusBreakdown(buckets) {
+  const el = document.getElementById('status-breakdown');
+  let s2=0, s3=0, s4=0, s5=0;
+  buckets.forEach(b => { s2+=b.s2xx; s3+=b.s3xx; s4+=b.s4xx; s5+=b.s5xx; });
+  const total = s2+s3+s4+s5 || 1;
+  const items = [
+    { label: '2xx', count: s2, color: '#4ade80' },
+    { label: '3xx', count: s3, color: '#38bdf8' },
+    { label: '4xx', count: s4, color: '#fbbf24' },
+    { label: '5xx', count: s5, color: '#f87171' },
+  ];
+  el.innerHTML = items.map(i => `
+    <div class="status-row">
+      <span class="status-dot" style="background:${i.color}"></span>
+      <span>${i.label}</span>
+      <div class="status-bar"><div class="status-bar-fill" style="width:${(i.count/total*100)}%;background:${i.color}"></div></div>
+      <span class="status-count">${i.count}</span>
+    </div>
+  `).join('');
+}
+
+function renderTopPaths(paths) {
+  const el = document.getElementById('top-paths');
+  if (!paths || !paths.length) { el.innerHTML = '<p class="empty">No data</p>'; return; }
+  el.innerHTML = paths.map(p =>
+    `<div class="path-row"><span class="path-name" title="${p.path}">${p.path}</span><span class="path-count">${p.count}</span></div>`
+  ).join('');
+}
+
+function updateAnalyticsStats(buckets) {
+  let totalReqs = 0, totalLatency = 0, reqsWithLatency = 0;
+  buckets.forEach(b => {
+    totalReqs += b.reqs;
+    if (b.avg_ms > 0) { totalLatency += b.avg_ms * b.reqs; reqsWithLatency += b.reqs; }
+  });
+  document.getElementById('stat-reqs').textContent = totalReqs;
+  document.getElementById('stat-latency').textContent =
+    reqsWithLatency > 0 ? Math.round(totalLatency / reqsWithLatency) + 'ms' : '0ms';
+}
+
+function startLogStream() {
+  if (logSSE) logSSE.close();
+  logSSE = new EventSource(API + '/logs/stream?key=' + encodeURIComponent(currentKey));
+  logSSE.onmessage = (e) => {
+    try { addLogRow(JSON.parse(e.data)); } catch {}
+  };
+  logSSE.onerror = () => {
+    setTimeout(() => { if (currentKey) startLogStream(); }, 5000);
+  };
+}
+
+function addLogRow(log) {
+  const tbody = document.getElementById('log-tbody');
+  const empty = tbody.querySelector('.empty');
+  if (empty) empty.parentElement.remove();
+  const tr = document.createElement('tr');
+  const t = new Date(log.ts).toLocaleTimeString();
+  const sc = log.s >= 500 ? 'log-s5' : log.s >= 400 ? 'log-s4' : log.s >= 300 ? 'log-s3' : 'log-s2';
+  const path = log.p.length > 35 ? log.p.slice(0, 32) + '...' : log.p;
+  tr.innerHTML = `<td>${t}</td><td>${log.m}</td><td title="${log.p}">${path}</td><td class="${sc}">${log.s}</td><td>${log.d}ms</td><td>${fmtBytes(log.z)}</td>`;
+  tbody.insertBefore(tr, tbody.firstChild);
+  while (tbody.children.length > MAX_LOG_ROWS) tbody.removeChild(tbody.lastChild);
+}
+
 // --- Init ---
 (async function init() {
   await fetchDomain();
@@ -307,4 +402,10 @@ function fmtBytes(b) {
       loadTunnels();
     }
   }, 3000);
+
+  setInterval(() => {
+    if (document.getElementById('page-panel').style.display !== 'none') {
+      loadTrafficStats();
+    }
+  }, 10000);
 })();
