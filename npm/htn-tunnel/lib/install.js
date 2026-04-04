@@ -5,8 +5,8 @@ const os = require("os");
 const https = require("https");
 const { execSync } = require("child_process");
 
-// Binary version from GitHub Releases.
-const VERSION = "0.3.0";
+// Binary version: read from package.json so it stays in sync with npm version.
+const VERSION = require("../package.json").version;
 const REPO = "nhh0718/htn-tunnel";
 
 const platform = os.platform();
@@ -19,10 +19,15 @@ const archiveExt = platform === "win32" ? ".zip" : ".tar.gz";
 const binDir = path.join(__dirname, "..", "bin");
 const binPath = path.join(binDir, `htn-tunnel${ext}`);
 
-// Skip if binary exists and works.
+// Skip only if binary exists AND matches expected version.
 if (fs.existsSync(binPath) && fs.statSync(binPath).size > 1000) {
-  console.log("htn-tunnel: binary already installed.");
-  process.exit(0);
+  try {
+    const out = execSync(`"${binPath}" --version`, { encoding: "utf8", timeout: 5000 }).trim();
+    if (out.includes(VERSION)) {
+      console.log(`htn-tunnel: v${VERSION} already installed.`);
+      process.exit(0);
+    }
+  } catch { /* version mismatch or error — re-download */ }
 }
 
 const archiveName = `htn-tunnel_${VERSION}_${goOS}_${goArch}${archiveExt}`;
