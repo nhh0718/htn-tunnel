@@ -504,11 +504,13 @@ func (h *Handler) adminOnly(next http.HandlerFunc) http.HandlerFunc {
 
 // --- Helpers ---
 
+// maskKey must produce the same format as server.maskToken
+// so that dashboard log filtering matches stored log entries.
 func maskKey(key string) string {
-	if len(key) < 12 {
-		return key
+	if len(key) <= 8 {
+		return "***"
 	}
-	return key[:8] + "..." + key[len(key)-4:]
+	return key[:4] + "..." + key[len(key)-4:]
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
