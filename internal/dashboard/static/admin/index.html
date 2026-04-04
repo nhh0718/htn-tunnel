@@ -7,7 +7,10 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Login -->
+
+  <!-- ============================================================
+       Login
+  ============================================================ -->
   <section id="page-login" class="page">
     <div class="login-box">
       <h1>htn-tunnel Admin</h1>
@@ -19,22 +22,45 @@
     </div>
   </section>
 
-  <!-- Panel -->
+  <!-- ============================================================
+       Panel
+  ============================================================ -->
   <section id="page-panel" class="page" style="display:none">
+
     <header>
       <h1>htn-tunnel Admin</h1>
       <button onclick="logout()">Logout</button>
     </header>
 
+    <!-- Stats -->
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-value" id="stat-keys">-</div><div class="stat-label">Users</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-http">-</div><div class="stat-label">HTTP</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-tcp">-</div><div class="stat-label">TCP</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-reqs">-</div><div class="stat-label">Requests</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-bw">-</div><div class="stat-label">Bandwidth</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-latency">-</div><div class="stat-label">Avg Latency</div></div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-keys">-</div>
+        <div class="stat-label">Users</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-http">-</div>
+        <div class="stat-label">HTTP</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-tcp">-</div>
+        <div class="stat-label">TCP</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-reqs">-</div>
+        <div class="stat-label">Requests</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-bw">-</div>
+        <div class="stat-label">Bandwidth</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-latency">-</div>
+        <div class="stat-label">Avg Latency</div>
+      </div>
     </div>
 
+    <!-- Tabs -->
     <div class="tabs">
       <button class="tab active" onclick="showTab('users')">Users</button>
       <button class="tab" onclick="showTab('tunnels')">Tunnels</button>
@@ -42,65 +68,102 @@
       <button class="tab" onclick="showTab('logs')">Logs</button>
     </div>
 
-    <!-- Users Tab -->
+    <!-- ---- Users Tab ---- -->
     <div id="tab-users" class="tab-content">
       <table>
-        <thead><tr>
-          <th>Key</th><th>Name</th><th>Subdomains</th><th>Limit</th><th>Status</th><th>Created</th><th>Action</th>
-        </tr></thead>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Name</th>
+            <th>Subdomains</th>
+            <th>Limit</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Action</th>
+          </tr>
+        </thead>
         <tbody id="keys-tbody">
           <tr><td colspan="7" class="empty">Loading...</td></tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Tunnels Tab -->
+    <!-- ---- Tunnels Tab ---- -->
     <div id="tab-tunnels" class="tab-content" style="display:none">
       <table>
-        <thead><tr>
-          <th>Type</th><th>Subdomain / Port</th><th>Local</th><th>User</th><th>Uptime</th><th>In / Out</th><th>Action</th>
-        </tr></thead>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Subdomain / Port</th>
+            <th>Local</th>
+            <th>User</th>
+            <th>Uptime</th>
+            <th>In / Out</th>
+            <th>Action</th>
+          </tr>
+        </thead>
         <tbody id="tunnels-tbody">
           <tr><td colspan="7" class="empty">Loading...</td></tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Config Tab -->
+    <!-- ---- Config Tab ---- -->
     <div id="tab-config" class="tab-content" style="display:none">
       <form id="config-form" onsubmit="return handleSaveConfig(event)">
         <div class="config-grid">
-          <label>Domain <input type="text" id="cfg-domain"></label>
-          <label>Max tunnels per key <input type="number" id="cfg-max-tunnels" min="1" max="100"></label>
-          <label>Rate limit (req/min) <input type="number" id="cfg-rate-limit" min="1"></label>
-          <label>Global rate limit <input type="number" id="cfg-global-rate-limit" min="1"></label>
-          <label class="checkbox-label"><input type="checkbox" id="cfg-allow-reg"> Allow registration</label>
+          <label>Domain
+            <input type="text" id="cfg-domain">
+          </label>
+          <label>Max tunnels per key
+            <input type="number" id="cfg-max-tunnels" min="1" max="100">
+          </label>
+          <label>Rate limit (req/min)
+            <input type="number" id="cfg-rate-limit" min="1">
+          </label>
+          <label>Global rate limit
+            <input type="number" id="cfg-global-rate-limit" min="1">
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="cfg-allow-reg">
+            Allow registration
+          </label>
         </div>
         <div id="config-msg" class="config-msg"></div>
-        <button type="submit" class="btn-primary">Save & Apply</button>
+        <button type="submit" class="btn-primary">Save &amp; Apply</button>
       </form>
     </div>
 
-    <!-- Logs Tab -->
+    <!-- ---- Logs Tab ---- -->
     <div id="tab-logs" class="tab-content" style="display:none">
       <div class="section-row">
         <div class="section-col">
-          <h3>Traffic <span class="subtitle">60 phút</span></h3>
+          <h3>Traffic <span class="subtitle">60 min</span></h3>
           <div class="chart-container" id="admin-traffic-chart"></div>
         </div>
         <div class="section-col section-col-sm">
           <h3>Status</h3>
           <div class="status-breakdown" id="admin-status-breakdown"></div>
-          <h3>Top Paths</h3>
+          <h3 style="margin-top:1rem">Top Paths</h3>
           <div id="admin-top-paths"></div>
         </div>
       </div>
-      <h3>Live Request Log <span class="badge-live">● LIVE</span></h3>
+
+      <h3>Live Request Log <span class="badge-live">&#9679; LIVE</span></h3>
       <div class="log-table-wrap">
         <table class="log-table">
-          <thead><tr>
-            <th>Time</th><th>Subdomain</th><th>Method</th><th>Path</th><th>Status</th><th>Duration</th><th>Size</th><th>User</th>
-          </tr></thead>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Subdomain</th>
+              <th>Method</th>
+              <th>Path</th>
+              <th>Status</th>
+              <th>Duration</th>
+              <th>Size</th>
+              <th>User</th>
+            </tr>
+          </thead>
           <tbody id="admin-log-tbody">
             <tr><td colspan="8" class="empty">Waiting for requests...</td></tr>
           </tbody>
@@ -109,6 +172,7 @@
     </div>
 
     <footer><span id="last-updated">-</span></footer>
+
   </section>
 
   <script src="app.js"></script>

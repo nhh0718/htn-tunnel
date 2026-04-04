@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
   <header>
     <h1>htn-tunnel</h1>
     <div id="user-nav" style="display:none">
@@ -15,26 +16,33 @@
     </div>
   </header>
 
-  <!-- Landing -->
+  <!-- ============================================================
+       Landing
+  ============================================================ -->
   <section id="page-landing" class="page">
     <div class="hero">
       <h2>Expose localhost ra internet</h2>
-      <p>Nhanh, bảo mật, miễn phí</p>
+      <p>Nhanh, bảo mật, miễn phí — chạy ngay trong vài giây</p>
       <div class="actions">
-        <button class="btn-primary" onclick="showPage('register')">Đăng ký</button>
+        <button class="btn-primary" onclick="showPage('register')">Đăng ký miễn phí</button>
         <button class="btn-secondary" onclick="showPage('login')">Đăng nhập</button>
       </div>
     </div>
   </section>
 
-  <!-- Register -->
+  <!-- ============================================================
+       Register
+  ============================================================ -->
   <section id="page-register" class="page" style="display:none">
     <h2>Tạo tài khoản</h2>
     <form id="register-form" onsubmit="return handleRegister(event)">
-      <label>Tên hiển thị <input type="text" id="reg-name" required placeholder="Tên của bạn"></label>
+      <label>Tên hiển thị
+        <input type="text" id="reg-name" required placeholder="Tên của bạn">
+      </label>
       <label>Subdomain
         <div class="subdomain-input">
-          <input type="text" id="reg-subdomain" placeholder="tenban" pattern="[a-z0-9][a-z0-9-]{1,61}[a-z0-9]">
+          <input type="text" id="reg-subdomain" placeholder="tenban"
+                 pattern="[a-z0-9][a-z0-9-]{1,61}[a-z0-9]">
           <span class="domain-suffix" id="domain-suffix">.</span>
         </div>
       </label>
@@ -43,42 +51,69 @@
     </form>
 
     <div id="reg-success" style="display:none">
-      <h3>Tạo tài khoản thành công!</h3>
+      <h2>Tạo tài khoản thành công!</h2>
       <div class="key-box">
-        <p>API Key của bạn (lưu lại cẩn thận!):</p>
+        <p>API Key của bạn — lưu lại cẩn thận!</p>
         <code id="reg-key"></code>
         <button id="copy-btn" onclick="copyKey()">Sao chép</button>
       </div>
       <div class="quickstart">
-        <h4>Bắt đầu nhanh:</h4>
+        <h4>Bắt đầu nhanh</h4>
         <pre id="reg-quickstart"></pre>
       </div>
-      <button class="btn-primary" onclick="loginWithKey(document.getElementById('reg-key').textContent)">Vào Dashboard</button>
+      <button class="btn-primary"
+              onclick="loginWithKey(document.getElementById('reg-key').textContent)">
+        Vào Dashboard
+      </button>
     </div>
     <p><a href="#" onclick="showPage('login')">Đã có API key? Đăng nhập</a></p>
   </section>
 
-  <!-- Login -->
+  <!-- ============================================================
+       Login
+  ============================================================ -->
   <section id="page-login" class="page" style="display:none">
     <h2>Đăng nhập</h2>
     <form onsubmit="return handleLogin(event)">
-      <label>Nhập API Key <input type="text" id="login-key" required placeholder="htk_..."></label>
+      <label>API Key
+        <input type="text" id="login-key" required placeholder="htk_...">
+      </label>
       <div id="login-error" class="error"></div>
       <button type="submit" class="btn-primary">Đăng nhập</button>
     </form>
     <p><a href="#" onclick="showPage('register')">Chưa có tài khoản? Đăng ký</a></p>
   </section>
 
-  <!-- Panel -->
+  <!-- ============================================================
+       Panel
+  ============================================================ -->
   <section id="page-panel" class="page" style="display:none">
+
+    <!-- Stats -->
     <div class="stats-grid stats-5">
-      <div class="stat-card"><div class="stat-value" id="stat-tunnels">0</div><div class="stat-label">Tunnels</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-reqs">0</div><div class="stat-label">Requests</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-in">0B</div><div class="stat-label">Traffic ↓</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-out">0B</div><div class="stat-label">Traffic ↑</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-latency">0ms</div><div class="stat-label">Avg Latency</div></div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-tunnels">0</div>
+        <div class="stat-label">Tunnels</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-reqs">0</div>
+        <div class="stat-label">Requests</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-in">0B</div>
+        <div class="stat-label">Traffic ↓</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-out">0B</div>
+        <div class="stat-label">Traffic ↑</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-latency">0ms</div>
+        <div class="stat-label">Avg Latency</div>
+      </div>
     </div>
 
+    <!-- Chart + sidebar -->
     <div class="section-row">
       <div class="section-col">
         <h2>Traffic <span class="subtitle">30 phút gần nhất</span></h2>
@@ -92,38 +127,52 @@
       </div>
     </div>
 
-    <h2>Request Log <span class="badge-live">● LIVE</span></h2>
+    <!-- Request log -->
+    <h2>Request Log <span class="badge-live">&#9679; LIVE</span></h2>
     <div class="log-table-wrap">
       <table class="log-table">
-        <thead><tr>
-          <th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Duration</th><th>Size</th>
-        </tr></thead>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Method</th>
+            <th>Path</th>
+            <th>Status</th>
+            <th>Duration</th>
+            <th>Size</th>
+          </tr>
+        </thead>
         <tbody id="log-tbody">
           <tr><td colspan="6" class="empty">Đợi request...</td></tr>
         </tbody>
       </table>
     </div>
 
+    <!-- Subdomains -->
     <h2>Subdomain của bạn</h2>
     <div id="subdomains-list"></div>
     <form id="add-subdomain-form" onsubmit="return handleAddSubdomain(event)">
-      <input type="text" id="add-sub-input" placeholder="subdomain-mới" pattern="[a-z0-9][a-z0-9-]{1,61}[a-z0-9]">
+      <input type="text" id="add-sub-input" placeholder="subdomain-mới"
+             pattern="[a-z0-9][a-z0-9-]{1,61}[a-z0-9]">
       <button type="submit">+ Thêm</button>
     </form>
     <div id="sub-error" class="error"></div>
 
+    <!-- Active tunnels -->
     <h2>Tunnels đang hoạt động</h2>
     <div id="tunnels-list">
       <p class="empty">Chưa có tunnel nào</p>
     </div>
 
+    <!-- Quick start -->
     <h2>Bắt đầu nhanh</h2>
     <pre id="panel-quickstart"></pre>
 
+    <!-- API key (collapsible) -->
     <details>
       <summary>API Key của bạn</summary>
       <code id="panel-key"></code>
     </details>
+
   </section>
 
   <footer>
