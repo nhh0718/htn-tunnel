@@ -1,10 +1,15 @@
 {
   "name": "htn-tunnel",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Self-hosted tunnel client — expose localhost to the internet",
   "bin": {
     "htn-tunnel": "./bin/htn-tunnel.js"
   },
+  "files": [
+    "bin/htn-tunnel.js",
+    "lib/install.js",
+    "README.md"
+  ],
   "scripts": {
     "postinstall": "node lib/install.js"
   },
