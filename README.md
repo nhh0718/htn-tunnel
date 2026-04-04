@@ -37,14 +37,16 @@ localhost:3000  ──tunnel──▶  Your VPS  ──internet──▶  https:
 
 | Feature | Description |
 |---------|-------------|
+| **Zero-auth start** | `htn-tunnel http 3000` works instantly, no registration |
 | **HTTP tunnels** | HTTPS subdomain routing (random or permanent) |
 | **TCP tunnels** | Raw port forwarding (databases, SSH, etc.) |
+| **Browser login** | `htn-tunnel login` opens browser, key auto-saved |
 | **Auto-TLS** | Wildcard Let's Encrypt via DNS-01 (Cloudflare) |
 | **WebSocket** | Full proxy with Origin rewrite (HMR, dev servers) |
-| **API keys** | Self-service registration via web dashboard |
 | **Fixed subdomains** | Claim once, yours forever |
-| **User dashboard** | Register, login, manage subdomains |
-| **Admin dashboard** | Manage users, tunnels, server config |
+| **Live analytics** | Real-time request log, traffic charts, status breakdown |
+| **User dashboard** | Register, manage subdomains, view traffic |
+| **Admin dashboard** | Manage users, tunnels, server config, analytics |
 | **Auto-reconnect** | Heartbeat + exponential backoff |
 | **Single binary** | No dependencies, cross-platform |
 
@@ -97,24 +99,28 @@ sudo mv htn-tunnel /usr/local/bin/
 
 ## Quick Start
 
-### 1. Register
-
-Open the dashboard in your browser and create an account:
-
-> **https://dashboard.33.id.vn/_dashboard/**
-
-Click **Register** → enter your name + desired subdomain → **Create Account** → copy your API key (`htk_...`)
-
-### 2. Save your key
+### Instant (no registration)
 
 ```bash
-htn-tunnel auth htk_your_key_here --server 33.id.vn:4443
+htn-tunnel http 3000
 ```
 
-### 3. Start tunneling
+```
+  Tunnel:    https://abc12xyz.33.id.vn → localhost:3000
+  Status:    connected
+```
+
+That's it! You get a random subdomain, limited to 1 tunnel, auto-expires after 2h.
+
+### With fixed subdomain
+
+Register via browser to claim a permanent subdomain:
 
 ```bash
-htn-tunnel http 3000 --subdomain myapp
+htn-tunnel login --server 33.id.vn:4443
+# Opens browser → register → key saved automatically
+
+htn-tunnel http 3000:myapp
 ```
 
 ```
@@ -122,9 +128,9 @@ htn-tunnel http 3000 --subdomain myapp
   Status:    connected
 ```
 
-That's it! Open `https://myapp.33.id.vn` in any browser.
+> Your subdomain is permanently yours. Reconnect anytime with the same name.
 
-> Your subdomain is permanently yours. Reconnect anytime with the same `--subdomain`.
+If you try a custom subdomain without logging in, htn-tunnel auto-prompts you to register.
 
 ### TCP tunnel
 
@@ -138,15 +144,17 @@ htn-tunnel tcp 5432
 ## CLI Reference
 
 ```
-htn-tunnel http <port> [--subdomain name]    Create HTTP tunnel
-htn-tunnel tcp  <port>                       Create TCP tunnel
-htn-tunnel auth <key>  [--server host:port]  Save API key
-htn-tunnel status                            Show account info
+htn-tunnel http <port>[:<subdomain>]         Create HTTP tunnel (anonymous or authenticated)
+htn-tunnel tcp  <port>                       Create TCP tunnel (requires auth)
+htn-tunnel login   [--server host:port]      Register/login via browser
+htn-tunnel logout                            Clear saved auth key
+htn-tunnel dashboard                         Open web dashboard in browser
+htn-tunnel status                            Show account info (or anonymous state)
+htn-tunnel auth <key>  [--server host:port]  Save API key manually
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--subdomain <name>` | Fixed subdomain (HTTP only) |
 | `--server <host:port>` | Server address |
 | `--token <key>` | Override auth token |
 
@@ -159,9 +167,9 @@ htn-tunnel status                            Show account info
 | **User** | `https://dashboard.33.id.vn/_dashboard/` | API key |
 | **Admin** | `https://dashboard.33.id.vn/_admin/` | Admin key |
 
-**User dashboard:** register, manage subdomains, view tunnel stats
+**User dashboard:** register, manage subdomains, live request log, traffic chart, status breakdown, top paths
 
-**Admin dashboard:** manage all users, view all tunnels, edit server config
+**Admin dashboard:** manage all users/tunnels, edit config, server-wide analytics with live log stream
 
 ---
 
@@ -230,14 +238,16 @@ Máy bạn (localhost:3000)  ──tunnel──▶  VPS  ──internet──▶
 
 | Tính năng | Mô tả |
 |-----------|-------|
+| **Dùng ngay** | `htn-tunnel http 3000` chạy ngay, không cần đăng ký |
 | **HTTP tunnels** | Subdomain HTTPS (random hoặc cố định vĩnh viễn) |
 | **TCP tunnels** | Forward port bất kỳ (database, SSH, ...) |
+| **Đăng nhập qua browser** | `htn-tunnel login` mở browser, key tự lưu |
 | **Auto-TLS** | Wildcard Let's Encrypt qua DNS-01 (Cloudflare) |
 | **WebSocket** | Proxy đầy đủ, hỗ trợ HMR (Next.js, Vite) |
-| **API key** | Người dùng tự đăng ký qua dashboard |
 | **Subdomain cố định** | Claim 1 lần, dùng mãi mãi |
-| **User dashboard** | Đăng ký, đăng nhập, quản lý subdomain |
-| **Admin dashboard** | Quản lý users, tunnels, sửa config |
+| **Analytics trực tiếp** | Request log real-time, biểu đồ traffic, phân tích status |
+| **User dashboard** | Đăng ký, quản lý subdomain, xem traffic |
+| **Admin dashboard** | Quản lý users, tunnels, config, analytics |
 | **Tự động kết nối lại** | Heartbeat + exponential backoff |
 | **Single binary** | Không cần cài thêm gì, chạy mọi nền tảng |
 
@@ -290,24 +300,28 @@ sudo mv htn-tunnel /usr/local/bin/
 
 ## Hướng dẫn nhanh
 
-### 1. Đăng ký tài khoản
-
-Mở dashboard trong trình duyệt:
-
-> **https://dashboard.33.id.vn/_dashboard/**
-
-Nhấn **Register** → nhập tên + subdomain → **Create Account** → copy API key (`htk_...`)
-
-### 2. Lưu API key
+### Dùng ngay (không cần đăng ký)
 
 ```bash
-htn-tunnel auth htk_key_của_bạn --server 33.id.vn:4443
+htn-tunnel http 3000
 ```
 
-### 3. Mở tunnel
+```
+  Tunnel:    https://abc12xyz.33.id.vn → localhost:3000
+  Status:    connected
+```
+
+Xong! Bạn nhận subdomain ngẫu nhiên, giới hạn 1 tunnel, tự hết hạn sau 2h.
+
+### Với subdomain cố định
+
+Đăng ký qua browser để claim subdomain riêng:
 
 ```bash
-htn-tunnel http 3000 --subdomain myapp
+htn-tunnel login --server 33.id.vn:4443
+# Mở browser → đăng ký → key tự động lưu
+
+htn-tunnel http 3000:myapp
 ```
 
 ```
@@ -315,9 +329,9 @@ htn-tunnel http 3000 --subdomain myapp
   Status:    connected
 ```
 
-Xong! Mở `https://myapp.33.id.vn` trên bất kỳ trình duyệt nào.
+> Subdomain của bạn là vĩnh viễn. Kết nối lại bất kỳ lúc nào.
 
-> Subdomain của bạn là vĩnh viễn. Kết nối lại bất kỳ lúc nào với cùng `--subdomain`.
+Nếu dùng subdomain cố định mà chưa đăng nhập, htn-tunnel sẽ tự mở browser cho bạn đăng ký.
 
 ### TCP tunnel
 
@@ -331,15 +345,17 @@ htn-tunnel tcp 5432
 ## Hướng dẫn CLI
 
 ```
-htn-tunnel http <port> [--subdomain tên]     Tạo HTTP tunnel
-htn-tunnel tcp  <port>                       Tạo TCP tunnel
-htn-tunnel auth <key>  [--server host:port]  Lưu API key
+htn-tunnel http <port>[:<subdomain>]         Tạo HTTP tunnel (ẩn danh hoặc đã đăng ký)
+htn-tunnel tcp  <port>                       Tạo TCP tunnel (cần đăng ký)
+htn-tunnel login   [--server host:port]      Đăng ký/đăng nhập qua browser
+htn-tunnel logout                            Xóa key đã lưu
+htn-tunnel dashboard                         Mở dashboard trên browser
 htn-tunnel status                            Xem thông tin tài khoản
+htn-tunnel auth <key>  [--server host:port]  Lưu API key thủ công
 ```
 
 | Flag | Mô tả |
 |------|-------|
-| `--subdomain <tên>` | Subdomain cố định (chỉ HTTP) |
 | `--server <host:port>` | Địa chỉ server |
 | `--token <key>` | Override auth token |
 
@@ -352,9 +368,9 @@ htn-tunnel status                            Xem thông tin tài khoản
 | **Người dùng** | `https://dashboard.33.id.vn/_dashboard/` | API key |
 | **Admin** | `https://dashboard.33.id.vn/_admin/` | Admin key |
 
-**User dashboard:** đăng ký, quản lý subdomain, xem thống kê tunnel
+**User dashboard:** đăng ký, quản lý subdomain, request log real-time, biểu đồ traffic, top paths
 
-**Admin dashboard:** quản lý users, tunnels, sửa cấu hình server
+**Admin dashboard:** quản lý users/tunnels, sửa config, analytics toàn server với live log stream
 
 ---
 
