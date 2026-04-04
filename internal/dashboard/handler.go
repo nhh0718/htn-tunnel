@@ -3,8 +3,10 @@ package dashboard
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -67,26 +69,72 @@ type ConfigProvider interface {
 	UpdateConfig(updates map[string]any) error
 }
 
+// RequestLogEntry mirrors server.LogEntry without importing the server package.
+type RequestLogEntry struct {
+	Timestamp  time.Time `json:"ts"`
+	TunnelID   string    `json:"tid"`
+	Subdomain  string    `json:"sub"`
+	Token      string    `json:"tok"`
+	Method     string    `json:"m"`
+	Path       string    `json:"p"`
+	Status     int       `json:"s"`
+	DurationMs int       `json:"d"`
+	Size       int64     `json:"z"`
+}
+
+// RequestLogBucket mirrors server.TrafficBucket for per-minute traffic stats.
+type RequestLogBucket struct {
+	Timestamp  time.Time `json:"ts"`
+	Requests   int       `json:"reqs"`
+	BytesIn    int64     `json:"bytes_in"`
+	BytesOut   int64     `json:"bytes_out"`
+	Status2xx  int       `json:"s2xx"`
+	Status3xx  int       `json:"s3xx"`
+	Status4xx  int       `json:"s4xx"`
+	Status5xx  int       `json:"s5xx"`
+	AvgLatency int       `json:"avg_ms"`
+}
+
+// RequestLogPathCount mirrors server.PathCount for top-paths analytics.
+type RequestLogPathCount struct {
+	Path  string `json:"path"`
+	Count int    `json:"count"`
+}
+
+// RequestLogProvider abstracts access to the in-memory request log.
+// Satisfied by server.RequestLogAdapter (in internal/server).
+type RequestLogProvider interface {
+	Recent(limit int, token string) []RequestLogEntry
+	TrafficStats(minutes int, token string) []RequestLogBucket
+	TopPaths(n int, token string) []RequestLogPathCount
+	Subscribe() chan RequestLogEntry
+	Unsubscribe(ch chan RequestLogEntry)
+}
+
 type contextKey string
 
 const ctxKeyID contextKey = "keyID"
 
 // Handler serves the user dashboard, admin dashboard, and their APIs.
 type Handler struct {
-	tunnels    TunnelProvider
-	keys       KeyProvider
-	config     ConfigProvider
-	adminToken string
-	domain     string
-	mux        *http.ServeMux
+	tunnels     TunnelProvider
+	keys        KeyProvider
+	config      ConfigProvider
+	requestLog  RequestLogProvider
+	adminToken  string
+	domain      string
+	mux         *http.ServeMux
 }
 
 // NewHandler creates a Handler and registers all routes.
-func NewHandler(tunnels TunnelProvider, keys KeyProvider, config ConfigProvider, adminToken, domain string) *Handler {
+// requestLog may be nil; analytics endpoints will return empty results when nil.
+func NewHandler(tunnels TunnelProvider, keys KeyProvider, config ConfigProvider,
+	adminToken, domain string, requestLog RequestLogProvider) *Handler {
 	h := &Handler{
 		tunnels:    tunnels,
 		keys:       keys,
 		config:     config,
+		requestLog: requestLog,
 		adminToken: adminToken,
 		domain:     domain,
 		mux:        http.NewServeMux(),
@@ -98,7 +146,7 @@ func NewHandler(tunnels TunnelProvider, keys KeyProvider, config ConfigProvider,
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'")
 	h.mux.ServeHTTP(w, r)
 }
 
@@ -112,6 +160,13 @@ func (h *Handler) registerRoutes() {
 	h.mux.HandleFunc("DELETE /_dashboard/api/subdomains/{name}", h.userAuth(h.handleRemoveSubdomain))
 	h.mux.HandleFunc("GET /_dashboard/api/tunnels", h.userAuth(h.handleUserTunnels))
 
+	// --- User analytics ---
+	h.mux.HandleFunc("GET /_dashboard/api/logs", h.userAuth(h.handleUserLogs))
+	h.mux.HandleFunc("GET /_dashboard/api/stats/traffic", h.userAuth(h.handleUserTraffic))
+	h.mux.HandleFunc("GET /_dashboard/api/stats/top-paths", h.userAuth(h.handleUserTopPaths))
+	// SSE: auth via ?key= query param (EventSource cannot send custom headers).
+	h.mux.HandleFunc("GET /_dashboard/api/logs/stream", h.handleUserLogStream)
+
 	// --- Admin Dashboard API ---
 	h.mux.HandleFunc("GET /_admin/api/stats", h.adminOnly(h.handleAdminStats))
 	h.mux.HandleFunc("GET /_admin/api/keys", h.adminOnly(h.handleAdminListKeys))
@@ -120,6 +175,13 @@ func (h *Handler) registerRoutes() {
 	h.mux.HandleFunc("POST /_admin/api/tunnels/{id}/kill", h.adminOnly(h.handleKill))
 	h.mux.HandleFunc("GET /_admin/api/config", h.adminOnly(h.handleGetConfig))
 	h.mux.HandleFunc("PUT /_admin/api/config", h.adminOnly(h.handleUpdateConfig))
+
+	// --- Admin analytics ---
+	h.mux.HandleFunc("GET /_admin/api/logs", h.adminOnly(h.handleAdminLogs))
+	h.mux.HandleFunc("GET /_admin/api/stats/traffic", h.adminOnly(h.handleAdminTraffic))
+	h.mux.HandleFunc("GET /_admin/api/stats/top-paths", h.adminOnly(h.handleAdminTopPaths))
+	// SSE: auth via ?key= query param.
+	h.mux.HandleFunc("GET /_admin/api/logs/stream", h.handleAdminLogStream)
 
 	// --- Static files ---
 	userFS, _ := fs.Sub(staticFiles, "static/user")
@@ -305,6 +367,105 @@ func (h *Handler) handleKill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"status": "killed"})
+}
+
+// --- User analytics handlers ---
+
+func (h *Handler) handleUserLogs(w http.ResponseWriter, r *http.Request) {
+	keyID := r.Context().Value(ctxKeyID).(string)
+	limit := 100
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 500 {
+			limit = n
+		}
+	}
+	writeJSON(w, h.requestLog.Recent(limit, maskKey(keyID)))
+}
+
+func (h *Handler) handleUserTraffic(w http.ResponseWriter, r *http.Request) {
+	keyID := r.Context().Value(ctxKeyID).(string)
+	writeJSON(w, h.requestLog.TrafficStats(30, maskKey(keyID)))
+}
+
+func (h *Handler) handleUserTopPaths(w http.ResponseWriter, r *http.Request) {
+	keyID := r.Context().Value(ctxKeyID).(string)
+	writeJSON(w, h.requestLog.TopPaths(10, maskKey(keyID)))
+}
+
+// handleUserLogStream streams new request log entries to the authenticated user
+// via Server-Sent Events. Auth is via ?key= query param (EventSource limitation).
+func (h *Handler) handleUserLogStream(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+	if key == "" || !h.keys.Validate(key) {
+		writeError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	h.serveSSE(w, r, maskKey(key))
+}
+
+// --- Admin analytics handlers ---
+
+func (h *Handler) handleAdminLogs(w http.ResponseWriter, r *http.Request) {
+	limit := 200
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 1000 {
+			limit = n
+		}
+	}
+	writeJSON(w, h.requestLog.Recent(limit, ""))
+}
+
+func (h *Handler) handleAdminTraffic(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, h.requestLog.TrafficStats(60, ""))
+}
+
+func (h *Handler) handleAdminTopPaths(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, h.requestLog.TopPaths(20, ""))
+}
+
+// handleAdminLogStream streams all request log entries to the authenticated admin.
+// Auth is via ?key= query param.
+func (h *Handler) handleAdminLogStream(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+	if key != h.adminToken {
+		writeError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	h.serveSSE(w, r, "")
+}
+
+// serveSSE writes a Server-Sent Events stream of RequestLogEntry JSON objects.
+// filterToken filters by token when non-empty; empty means all entries.
+func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request, filterToken string) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "SSE not supported", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	flusher.Flush()
+
+	ch := h.requestLog.Subscribe()
+	defer h.requestLog.Unsubscribe(ch)
+
+	for {
+		select {
+		case entry, ok := <-ch:
+			if !ok {
+				return
+			}
+			if filterToken != "" && entry.Token != filterToken {
+				continue
+			}
+			data, _ := json.Marshal(entry)
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 // --- Middleware ---

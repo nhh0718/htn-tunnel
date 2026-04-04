@@ -25,13 +25,15 @@ import (
 type HTTPProxy struct {
 	cfg           *config.ServerConfig
 	tunnelManager *TunnelManager
+	requestLog    *RequestLog
 	tlsListener   net.Listener
 	httpListener  net.Listener
 }
 
 // NewHTTPProxy creates an HTTPProxy backed by the given TunnelManager.
-func NewHTTPProxy(cfg *config.ServerConfig, tm *TunnelManager) *HTTPProxy {
-	return &HTTPProxy{cfg: cfg, tunnelManager: tm}
+// rl may be nil; if provided, every proxied request is recorded in it.
+func NewHTTPProxy(cfg *config.ServerConfig, tm *TunnelManager, rl *RequestLog) *HTTPProxy {
+	return &HTTPProxy{cfg: cfg, tunnelManager: tm, requestLog: rl}
 }
 
 // Start opens the TLS listener on :443 and the plain HTTP listener on :80.
@@ -168,8 +170,24 @@ func (p *HTTPProxy) serveRequest(w http.ResponseWriter, r *http.Request, subdoma
 	}
 	proxy.ServeHTTP(rw, r)
 
+	dur := time.Since(start)
 	// Send request log to client via control stream.
-	sendRequestLog(ts, r.Method, r.URL.Path, rw.status, time.Since(start), rw.size)
+	sendRequestLog(ts, r.Method, r.URL.Path, rw.status, dur, rw.size)
+
+	// Store in in-memory log for dashboard analytics.
+	if p.requestLog != nil {
+		p.requestLog.Add(LogEntry{
+			Timestamp:  start,
+			TunnelID:   ts.ID,
+			Subdomain:  ts.Subdomain,
+			Token:      maskToken(ts.Token),
+			Method:     r.Method,
+			Path:       r.URL.Path,
+			Status:     rw.status,
+			DurationMs: int(dur.Milliseconds()),
+			Size:       rw.size,
+		})
+	}
 }
 
 // proxyWebSocket hijacks the HTTP connection and forwards raw bytes through

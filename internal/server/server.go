@@ -47,6 +47,7 @@ type Server struct {
 	tunnelManager  *TunnelManager
 	httpProxy      *HTTPProxy
 	tcpProxy       *TCPProxy
+	requestLog     *RequestLog
 	listener       net.Listener
 }
 
@@ -65,16 +66,19 @@ func NewServer(cfg *config.ServerConfig, configPath string) (*Server, error) {
 	// Start anonymous tunnel expiry goroutine.
 	tm.StartAnonymousExpiry(time.Duration(cfg.AnonTunnelTTL) * time.Second)
 
+	rl := NewRequestLog()
+
 	return &Server{
 		cfg:            cfg,
 		configProvider: NewConfigProvider(cfg, configPath),
 		tokenStore:     ts,
 		keyStore:       ks,
-		rateLimiter:   NewRateLimiter(cfg.RateLimit, cfg.GlobalRateLimit),
-		ipLimiter:     newIPRateLimiter(10), // 10 pre-auth conn/min per IP
-		tunnelManager: tm,
-		httpProxy:     NewHTTPProxy(cfg, tm),
-		tcpProxy:      tcp,
+		rateLimiter:    NewRateLimiter(cfg.RateLimit, cfg.GlobalRateLimit),
+		ipLimiter:      newIPRateLimiter(10), // 10 pre-auth conn/min per IP
+		tunnelManager:  tm,
+		httpProxy:      NewHTTPProxy(cfg, tm, rl),
+		tcpProxy:       tcp,
+		requestLog:     rl,
 	}, nil
 }
 
@@ -86,7 +90,8 @@ func (s *Server) startDashboard(ctx context.Context) {
 	if !s.cfg.DashboardEnabled {
 		return
 	}
-	h := dashboard.NewHandler(s.tunnelManager, NewKeyStoreAdapter(s.keyStore), s.configProvider, s.cfg.AdminToken, s.cfg.Domain)
+	rlAdapter := NewRequestLogAdapter(s.requestLog)
+	h := dashboard.NewHandler(s.tunnelManager, NewKeyStoreAdapter(s.keyStore), s.configProvider, s.cfg.AdminToken, s.cfg.Domain, rlAdapter)
 	srv := &http.Server{
 		Addr:    s.cfg.DashboardAddr,
 		Handler: h,
