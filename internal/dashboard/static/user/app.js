@@ -3,6 +3,40 @@ const API = '/_dashboard/api';
 let currentKey = localStorage.getItem('htn_key') || '';
 let domain = '';
 
+// --- CLI Callback Support ---
+// When opened via "htn-tunnel login", the URL contains ?callback=http://127.0.0.1:PORT/cb
+// After register/login, redirect the key back to the CLI callback server.
+
+function isValidCallback(url) {
+  try {
+    const u = new URL(url);
+    return u.hostname === '127.0.0.1';
+  } catch { return false; }
+}
+
+function getCallbackURL() {
+  // Check hash params: #register?callback=http://...
+  const hash = window.location.hash;
+  const hashMatch = hash.match(/callback=([^&]+)/);
+  if (hashMatch) {
+    const url = decodeURIComponent(hashMatch[1]);
+    return isValidCallback(url) ? url : null;
+  }
+  // Check query string: ?callback=http://...
+  const params = new URLSearchParams(window.location.search);
+  const url = params.get('callback');
+  if (url && isValidCallback(url)) return url;
+  return null;
+}
+
+function redirectToCallback(key, name) {
+  const cb = getCallbackURL();
+  if (!cb) return false;
+  const url = cb + '?key=' + encodeURIComponent(key) + '&name=' + encodeURIComponent(name || '');
+  window.location.href = url;
+  return true;
+}
+
 function headers() {
   return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentKey };
 }
@@ -53,6 +87,10 @@ async function handleRegister(e) {
     if (data.error) { errEl.textContent = data.error; return false; }
 
     domain = data.domain || domain;
+
+    // If opened from CLI login, redirect key back to callback server.
+    if (redirectToCallback(data.key, document.getElementById('reg-name').value)) return false;
+
     document.getElementById('reg-key').textContent = data.key;
     const sub = (data.subdomains && data.subdomains[0]) || '';
     document.getElementById('reg-quickstart').textContent =
@@ -108,6 +146,8 @@ async function handleLogin(e) {
     });
     const data = await res.json();
     if (data.error) { errEl.textContent = data.error; return false; }
+    // If opened from CLI login, redirect key back to callback server.
+    if (redirectToCallback(key, data.name || '')) return false;
     loginWithKey(key);
   } catch (err) {
     errEl.textContent = err.message;
@@ -232,16 +272,29 @@ function fmtBytes(b) {
 (async function init() {
   await fetchDomain();
 
+  const callbackURL = getCallbackURL();
+
   if (currentKey) {
     try {
       const me = await api('GET', '/me');
       domain = me.domain || domain;
+      // If callback present and already logged in, redirect key immediately.
+      if (callbackURL) {
+        redirectToCallback(currentKey, me.name || '');
+        return;
+      }
       loadPanel();
       return;
     } catch {
       localStorage.removeItem('htn_key');
       currentKey = '';
     }
+  }
+
+  // If callback present, show register form for CLI login flow.
+  if (callbackURL) {
+    showPage('register');
+    return;
   }
 
   const hash = window.location.hash.replace('#', '') || 'landing';

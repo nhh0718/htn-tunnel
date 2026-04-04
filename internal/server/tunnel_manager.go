@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -339,6 +340,51 @@ func (tm *TunnelManager) StatsForDashboard() dashboard.AggregateStats {
 		BytesIn:      s.BytesIn,
 		BytesOut:     s.BytesOut,
 	}
+}
+
+// TunnelsForAnon returns active tunnels for an anonymous token (e.g. "anon:1.2.3.4").
+func (tm *TunnelManager) TunnelsForAnon(token string) []*TunnelSession {
+	var out []*TunnelSession
+	tm.mu.RLock()
+	for _, s := range tm.httpTunnels {
+		if s.Token == token && !s.Reserved {
+			out = append(out, s)
+		}
+	}
+	for _, s := range tm.tcpTunnels {
+		if s.Token == token {
+			out = append(out, s)
+		}
+	}
+	tm.mu.RUnlock()
+	return out
+}
+
+// StartAnonymousExpiry launches a goroutine that kills anonymous tunnels older than ttl.
+func (tm *TunnelManager) StartAnonymousExpiry(ttl time.Duration) {
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			now := time.Now()
+			tm.mu.RLock()
+			var toKill []string
+			for _, s := range tm.httpTunnels {
+				if strings.HasPrefix(s.Token, "anon:") && !s.Reserved && now.Sub(s.CreatedAt) > ttl {
+					toKill = append(toKill, s.ID)
+				}
+			}
+			for _, s := range tm.tcpTunnels {
+				if strings.HasPrefix(s.Token, "anon:") && now.Sub(s.CreatedAt) > ttl {
+					toKill = append(toKill, s.ID)
+				}
+			}
+			tm.mu.RUnlock()
+			for _, id := range toKill {
+				tm.KillTunnelByID(id)
+			}
+		}
+	}()
 }
 
 // KillTunnelByID closes the tunnel with the given ID. Returns false if not found.

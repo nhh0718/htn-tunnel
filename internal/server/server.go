@@ -17,6 +17,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/yamux"
@@ -61,6 +62,9 @@ func NewServer(cfg *config.ServerConfig, configPath string) (*Server, error) {
 	}
 	tm := NewTunnelManager(cfg.TCPPortRange[0], cfg.TCPPortRange[1])
 	tcp := NewTCPProxy(tm)
+	// Start anonymous tunnel expiry goroutine.
+	tm.StartAnonymousExpiry(time.Duration(cfg.AnonTunnelTTL) * time.Second)
+
 	return &Server{
 		cfg:            cfg,
 		configProvider: NewConfigProvider(cfg, configPath),
@@ -193,20 +197,32 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
-	// Validate token: try API key store first, then legacy tokens.
-	tokenValid := false
-	if IsAPIKey(authMsg.Token) {
-		tokenValid = s.keyStore.Validate(authMsg.Token)
+	// Anonymous mode: empty token → assign "anon:<IP>" virtual token.
+	if authMsg.Token == "" {
+		if s.cfg.AllowAnonymous == nil || !*s.cfg.AllowAnonymous {
+			_ = enc.Encode(protocol.MsgAuthResponse, protocol.AuthResponseMsg{
+				Success: false, Message: "anonymous connections are disabled — run 'htn-tunnel login' to register",
+			})
+			return
+		}
+		authMsg.Token = "anon:" + remoteIP
+		slog.Info("anonymous client connected", "ip", remoteIP)
 	} else {
-		tokenValid = s.tokenStore.Validate(authMsg.Token)
-	}
+		// Validate token: try API key store first, then legacy tokens.
+		tokenValid := false
+		if IsAPIKey(authMsg.Token) {
+			tokenValid = s.keyStore.Validate(authMsg.Token)
+		} else {
+			tokenValid = s.tokenStore.Validate(authMsg.Token)
+		}
 
-	if !tokenValid {
-		slog.Warn("auth failed", "ip", remoteIP, "token_prefix", maskToken(authMsg.Token))
-		_ = enc.Encode(protocol.MsgAuthResponse, protocol.AuthResponseMsg{
-			Success: false, Message: "invalid token",
-		})
-		return
+		if !tokenValid {
+			slog.Warn("auth failed", "ip", remoteIP, "token_prefix", maskToken(authMsg.Token))
+			_ = enc.Encode(protocol.MsgAuthResponse, protocol.AuthResponseMsg{
+				Success: false, Message: "invalid token",
+			})
+			return
+		}
 	}
 
 	// Clear auth deadline; set ongoing idle deadline.
@@ -348,6 +364,12 @@ func (s *Server) handleControlSession(session *yamux.Session, token, remoteIP st
 
 // handleAccountInfo responds with account details for the authenticated key.
 func (s *Server) handleAccountInfo(enc *protocol.Encoder, token string) {
+	if strings.HasPrefix(token, "anon:") {
+		_ = enc.Encode(protocol.MsgAccountInfoResp, protocol.AccountInfoRespMsg{
+			Name: "anonymous", MaxTunnels: 1, Domain: s.cfg.Domain,
+		})
+		return
+	}
 	if IsAPIKey(token) {
 		k := s.keyStore.GetKey(token)
 		if k != nil {
@@ -363,8 +385,11 @@ func (s *Server) handleAccountInfo(enc *protocol.Encoder, token string) {
 	})
 }
 
-// decrementTunnels handles both API keys and legacy tokens.
+// decrementTunnels handles API keys, legacy tokens, and anonymous (no-op).
 func (s *Server) decrementTunnels(token string) {
+	if strings.HasPrefix(token, "anon:") {
+		return
+	}
 	if IsAPIKey(token) {
 		s.keyStore.DecrementTunnels(token)
 	} else {
@@ -385,22 +410,42 @@ func (s *Server) handleTunnelRequest(
 		return
 	}
 
+	// Anonymous: only random HTTP subdomains, no TCP, max 1 tunnel per IP.
+	if strings.HasPrefix(token, "anon:") {
+		if req.Type == protocol.TunnelTCP {
+			sendTunnelError(enc, "anonymous users cannot create TCP tunnels — run 'htn-tunnel login' to register")
+			return
+		}
+		if req.Subdomain != "" {
+			sendTunnelError(enc, "anonymous users cannot request custom subdomains — run 'htn-tunnel login' to register")
+			return
+		}
+		// Enforce 1 tunnel per anonymous IP.
+		existing := s.tunnelManager.TunnelsForAnon(token)
+		if len(existing) >= 1 {
+			sendTunnelError(enc, "anonymous users are limited to 1 tunnel — run 'htn-tunnel login' for more")
+			return
+		}
+	}
+
 	// Check rate limit.
 	if !s.rateLimiter.Allow(token) {
 		sendTunnelError(enc, "rate limit exceeded")
 		return
 	}
 
-	// Check tunnel count (API key vs legacy token).
-	if IsAPIKey(token) {
-		if err := s.keyStore.IncrementTunnels(token); err != nil {
-			sendTunnelError(enc, err.Error())
-			return
-		}
-	} else {
-		if err := s.tokenStore.IncrementTunnels(token); err != nil {
-			sendTunnelError(enc, err.Error())
-			return
+	// Check tunnel count (API key vs legacy token; anonymous skips — enforced above).
+	if !strings.HasPrefix(token, "anon:") {
+		if IsAPIKey(token) {
+			if err := s.keyStore.IncrementTunnels(token); err != nil {
+				sendTunnelError(enc, err.Error())
+				return
+			}
+		} else {
+			if err := s.tokenStore.IncrementTunnels(token); err != nil {
+				sendTunnelError(enc, err.Error())
+				return
+			}
 		}
 	}
 

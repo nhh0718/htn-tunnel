@@ -52,6 +52,10 @@ type ServerConfig struct {
 	KeyStorePath string `yaml:"key_store_path"`
 	// AllowRegistration enables self-service API key registration (default true).
 	AllowRegistration *bool `yaml:"allow_registration"`
+	// AllowAnonymous enables anonymous (no-token) connections with limited features (default true).
+	AllowAnonymous *bool `yaml:"allow_anonymous"`
+	// AnonTunnelTTL is how long anonymous tunnels live before auto-expiry, in seconds (default 7200 = 2h).
+	AnonTunnelTTL int `yaml:"anon_tunnel_ttl"`
 }
 
 // defaults fills in zero values with sensible defaults.
@@ -89,6 +93,13 @@ func (c *ServerConfig) defaults() {
 	if c.AllowRegistration == nil {
 		t := true
 		c.AllowRegistration = &t
+	}
+	if c.AllowAnonymous == nil {
+		t := true
+		c.AllowAnonymous = &t
+	}
+	if c.AnonTunnelTTL == 0 {
+		c.AnonTunnelTTL = 7200 // 2 hours
 	}
 	// DashboardEnabled defaults to true — apply after YAML parse only if not explicitly set.
 	// (yaml.v3 leaves bool false when the key is absent, so we can't distinguish

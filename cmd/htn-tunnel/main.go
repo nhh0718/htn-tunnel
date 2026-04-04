@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/nhh0718/htn-tunnel/internal/client"
 	"github.com/nhh0718/htn-tunnel/internal/config"
@@ -32,7 +35,7 @@ func main() {
 	root.PersistentFlags().StringVar(&flagServer, "server", "", "server address (host:port)")
 	root.PersistentFlags().StringVar(&flagToken, "token", "", "override auth token")
 
-	root.AddCommand(httpCmd(), tcpCmd(), authCmd(), statusCmd())
+	root.AddCommand(httpCmd(), tcpCmd(), authCmd(), loginCmd(), logoutCmd(), dashboardCmd(), statusCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -63,17 +66,25 @@ func httpCmd() *cobra.Command {
 				return err
 			}
 
+			// Custom subdomain requires auth — auto-trigger login if no token.
+			if sub != "" && cfg.Token == "" {
+				fmt.Println("\n  Cần đăng ký để dùng subdomain cố định.")
+				if err := runLogin(cfg); err != nil {
+					return err
+				}
+			}
+
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 
-			// If no subdomain specified, try interactive picker.
-			if sub == "" {
+			// If authenticated and no subdomain specified, try interactive picker.
+			if sub == "" && cfg.Token != "" {
 				resolved, err := pickSubdomain(ctx, cfg)
 				if err != nil {
 					return err
 				}
 				sub = resolved
-			} else {
+			} else if sub != "" && cfg.Token != "" {
 				// Validate subdomain is owned by this key.
 				if err := validateSubdomain(ctx, cfg, sub); err != nil {
 					resolved, pickErr := handleSubdomainError(ctx, cfg, sub, err)
@@ -83,6 +94,7 @@ func httpCmd() *cobra.Command {
 					sub = resolved
 				}
 			}
+			// Token empty + no subdomain → anonymous random subdomain (no picker).
 
 			r := client.NewReconnector(cfg, "http", localPort, sub, version)
 			return r.Run(ctx)
@@ -124,7 +136,7 @@ func pickSubdomain(ctx context.Context, cfg *config.ClientConfig) (string, error
 		domain = host
 	}
 
-	fmt.Println("\n  Chọn subdomain:\n")
+	fmt.Printf("\n  Chọn subdomain:\n\n")
 	for i, sub := range info.Subdomains {
 		fmt.Printf("  [%d] %s.%s\n", i+1, sub, domain)
 	}
@@ -204,6 +216,85 @@ func handleSubdomainError(ctx context.Context, cfg *config.ClientConfig, request
 	return "", nil // random
 }
 
+// loginCmd implements: htn-tunnel login — opens browser for registration, receives key via callback.
+func loginCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "login",
+		Short: "Đăng ký hoặc đăng nhập qua browser",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, _ := loadClientCfg()
+			return runLogin(cfg)
+		},
+	}
+}
+
+// runLogin executes the browser-based login/register flow.
+// Starts a localhost callback server, opens the dashboard in the browser,
+// waits for the key callback or falls back to manual entry.
+func runLogin(cfg *config.ClientConfig) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	callbackURL, resultCh, err := client.StartCallbackServer(ctx)
+	if err != nil {
+		return err
+	}
+
+	domain := extractHost(cfg.ServerAddr)
+	dashboardURL := fmt.Sprintf("https://dashboard.%s/_dashboard/#register?callback=%s",
+		domain, url.QueryEscape(callbackURL))
+
+	fmt.Printf("\n  Đang mở trình duyệt...\n  %s\n\n", dashboardURL)
+
+	if err := client.OpenBrowser(dashboardURL); err != nil {
+		// Fallback: manual key entry for headless/SSH.
+		fmt.Printf("  Không mở được browser. Mở link trên rồi nhập key:\n  Key: ")
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			key := strings.TrimSpace(scanner.Text())
+			if key != "" {
+				cfg.Token = key
+				if err := config.SaveClientConfig(cfg); err != nil {
+					return fmt.Errorf("save config: %w", err)
+				}
+				fmt.Printf("\n  ✓ Auth thành công! Key đã lưu.\n\n")
+				return nil
+			}
+		}
+		return fmt.Errorf("không nhận được key")
+	}
+
+	fmt.Printf("  (Đợi đăng ký trên browser...)\n\n")
+
+	select {
+	case result := <-resultCh:
+		if result.Key == "" {
+			return fmt.Errorf("không nhận được key từ browser")
+		}
+		cfg.Token = result.Key
+		if err := config.SaveClientConfig(cfg); err != nil {
+			return fmt.Errorf("save config: %w", err)
+		}
+		fmt.Printf("  ✓ Auth thành công! Key đã lưu.\n")
+		if result.Name != "" {
+			fmt.Printf("  Xin chào, %s!\n", result.Name)
+		}
+		fmt.Println()
+	case <-ctx.Done():
+		return fmt.Errorf("timeout — không nhận được phản hồi từ browser")
+	}
+	return nil
+}
+
+// extractHost extracts the hostname from "host:port" or returns addr as-is.
+func extractHost(addr string) string {
+	host, _, err := splitHostPort(addr)
+	if err != nil || host == "" {
+		return addr
+	}
+	return host
+}
+
 // tcpCmd implements: htn-tunnel tcp <port>
 func tcpCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -269,6 +360,16 @@ func statusCmd() *cobra.Command {
 				return err
 			}
 
+			fmt.Printf("\nhtn-tunnel status\n\n")
+
+			if cfg.Token == "" {
+				fmt.Printf("  Status:    Chưa đăng nhập (anonymous)\n")
+				fmt.Printf("  Tunnels:   Random subdomain, giới hạn 1/IP\n")
+				fmt.Printf("  Server:    %s\n\n", cfg.ServerAddr)
+				fmt.Printf("  Đăng ký:   htn-tunnel login\n\n")
+				return nil
+			}
+
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 
@@ -287,12 +388,46 @@ func statusCmd() *cobra.Command {
 			if len(masked) > 12 {
 				masked = masked[:8] + "..." + masked[len(masked)-4:]
 			}
-			fmt.Printf("\nhtn-tunnel status\n\n")
 			fmt.Printf("  Key:         %s\n", masked)
 			fmt.Printf("  Name:        %s\n", info.Name)
 			fmt.Printf("  Subdomains:  %s\n", joinOrNone(info.Subdomains))
 			fmt.Printf("  Max tunnels: %d\n", info.MaxTunnels)
 			fmt.Printf("  Server:      %s\n\n", cfg.ServerAddr)
+			return nil
+		},
+	}
+}
+
+// dashboardCmd opens the web dashboard in the user's browser.
+func dashboardCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "dashboard",
+		Short: "Mở dashboard trong trình duyệt",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, _ := loadClientCfg()
+			domain := extractHost(cfg.ServerAddr)
+			u := fmt.Sprintf("https://dashboard.%s/_dashboard/", domain)
+			fmt.Printf("  Đang mở: %s\n", u)
+			return client.OpenBrowser(u)
+		},
+	}
+}
+
+// logoutCmd clears the saved auth key.
+func logoutCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "logout",
+		Short: "Xóa auth key khỏi máy",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg := &config.ClientConfig{}
+			// Preserve server address, clear token.
+			if old, err := config.LoadClientConfig(); err == nil {
+				cfg.ServerAddr = old.ServerAddr
+			}
+			if err := config.SaveClientConfig(cfg); err != nil {
+				return fmt.Errorf("save config: %w", err)
+			}
+			fmt.Println("  ✓ Đã đăng xuất. Key đã xóa.")
 			return nil
 		},
 	}
@@ -313,6 +448,7 @@ func joinOrNone(ss []string) string {
 }
 
 // loadClientCfg loads the client config file and applies flag overrides.
+// Token may be empty (anonymous mode).
 func loadClientCfg() (*config.ClientConfig, error) {
 	cfg, err := config.LoadClientConfig()
 	if err != nil {
@@ -327,9 +463,7 @@ func loadClientCfg() (*config.ClientConfig, error) {
 	if cfg.ServerAddr == "" {
 		cfg.ServerAddr = "localhost:4443"
 	}
-	if cfg.Token == "" {
-		return nil, fmt.Errorf("no auth token set; run: htn-tunnel auth <token>")
-	}
+	// No longer require token — empty token = anonymous mode.
 	return cfg, nil
 }
 
@@ -344,11 +478,6 @@ func parsePort(s string) (int, error) {
 func printBanner(ver, status string) {
 	fmt.Printf("\nhtn-tunnel v%s\n\n", ver)
 	fmt.Printf("  Status:    %s\n", status)
-}
-
-// splitAddr extracts host from "host:port".
-func splitAddr(addr string) (host, port string, err error) {
-	return splitHostPort(addr)
 }
 
 func splitHostPort(addr string) (string, string, error) {
