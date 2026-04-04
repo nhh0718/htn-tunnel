@@ -6,7 +6,7 @@ const https = require("https");
 const { execSync } = require("child_process");
 
 // Binary version from GitHub Releases.
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const REPO = "nhh0718/htn-tunnel";
 
 const platform = os.platform();
