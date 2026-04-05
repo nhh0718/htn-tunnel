@@ -445,10 +445,18 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request, filterToken s
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // disable nginx buffering
+
+	// Send initial comment so EventSource transitions to "open" state immediately.
+	fmt.Fprintf(w, ": connected\n\n")
 	flusher.Flush()
 
 	ch := h.requestLog.Subscribe()
 	defer h.requestLog.Unsubscribe(ch)
+
+	// Keepalive ticker prevents nginx/proxy from killing idle connections.
+	keepalive := time.NewTicker(15 * time.Second)
+	defer keepalive.Stop()
 
 	for {
 		select {
@@ -461,6 +469,9 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request, filterToken s
 			}
 			data, _ := json.Marshal(entry)
 			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		case <-keepalive.C:
+			fmt.Fprintf(w, ": ping\n\n")
 			flusher.Flush()
 		case <-r.Context().Done():
 			return
