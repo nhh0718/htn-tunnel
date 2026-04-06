@@ -71,12 +71,7 @@ func healthCmd() *cobra.Command {
 		Use:   "health",
 		Short: "Check server health",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := flagConfig
-			if path == "" {
-				path = "server.yaml"
-			}
-
-			cfg, err := config.LoadServerConfig(path)
+			cfg, err := config.LoadServerConfig(resolveConfigPath())
 			if err != nil {
 				// Fall back to default dashboard addr when config is missing.
 				cfg = &config.ServerConfig{DashboardAddr: ":8080"}
