@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>htn-tunnel — Expose localhost ra internet. Self-hosted, miễn phí.</title>
+  <meta name="description" content="htn-tunnel là công cụ self-hosted thay thế ngrok — expose localhost ra internet, hỗ trợ HTTP/TCP, subdomain cố định, dashboard analytics, auto-TLS. Miễn phí, mã nguồn mở." />
+  <meta name="keywords" content="htn-tunnel, ngrok alternative, self-hosted tunnel, localhost tunnel, expose localhost, HTTP tunnel, TCP tunnel, Vietnam" />
+  <meta name="author" content="htn-tunnel" />
+
+  <!-- Open Graph -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:title"       content="htn-tunnel — Expose localhost ra internet" />
+  <meta property="og:description" content="Self-hosted tunnel thay thế ngrok. Miễn phí, mã nguồn mở, hỗ trợ HTTP/TCP, subdomain cố định, auto-TLS." />
+  <meta property="og:url"         content="https://nhh0718.github.io/htn-tunnel/" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary" />
+  <meta name="twitter:title"       content="htn-tunnel — Expose localhost ra internet" />
+  <meta name="twitter:description" content="Self-hosted tunnel thay thế ngrok. Miễn phí, mã nguồn mở." />
+
+  <link rel="canonical" href="https://nhh0718.github.io/htn-tunnel/" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     NAV
+════════════════════════════════════════════════════════ -->
+<nav class="nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo" aria-label="htn-tunnel home">
+      <span class="logo-dot" aria-hidden="true"></span>
+      htn-tunnel
+    </a>
+
+    <ul class="nav-links" role="list">
+      <li><a href="#tinh-nang">Tính năng</a></li>
+      <li><a href="#cai-dat">Cài đặt</a></li>
+      <li><a href="#huong-dan">Hướng dẫn</a></li>
+      <li><a href="#cli-reference">CLI</a></li>
+      <li><a href="#self-host">Self-Host</a></li>
+      <li>
+        <a href="https://github.com/nhh0718/htn-tunnel" class="nav-github"
+           target="_blank" rel="noopener noreferrer">GitHub</a>
+      </li>
+    </ul>
+
+    <button class="nav-hamburger" id="hamburger"
+            aria-label="Mở menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile drawer -->
+<div class="nav-drawer" id="nav-drawer" role="dialog" aria-label="Mobile menu">
+  <ul>
+    <li><a href="#tinh-nang">Tính năng</a></li>
+    <li><a href="#cai-dat">Cài đặt</a></li>
+    <li><a href="#huong-dan">Hướng dẫn</a></li>
+    <li><a href="#cli-reference">CLI Reference</a></li>
+    <li><a href="#vi-du">Ví dụ</a></li>
+    <li><a href="#self-host">Self-Host</a></li>
+    <li><a href="https://github.com/nhh0718/htn-tunnel" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+  </ul>
+</div>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════════
+     HERO
+════════════════════════════════════════════════════════ -->
+<section class="hero" aria-labelledby="hero-heading">
+  <div class="container">
+
+    <div class="hero-badge" aria-label="Trạng thái: Mã nguồn mở, MIT License">
+      <span aria-hidden="true">●</span> MIT License · Mã nguồn mở
+    </div>
+
+    <h1 id="hero-heading">
+      Expose localhost<br/>
+      <span class="accent">ra internet</span>
+    </h1>
+
+    <p class="hero-sub">
+      Self-hosted tunnel — thay thế ngrok, miễn phí, mã nguồn mở.<br/>
+      Hỗ trợ HTTP &amp; TCP, subdomain cố định, auto-TLS, dashboard analytics.
+    </p>
+
+    <div class="hero-cta">
+      <a href="#cai-dat" class="btn btn-primary">Bắt đầu ngay</a>
+      <a href="https://github.com/nhh0718/htn-tunnel" class="btn btn-ghost"
+         target="_blank" rel="noopener noreferrer">GitHub →</a>
+    </div>
+
+    <!-- ASCII flow diagram -->
+    <div class="hero-diagram" role="img" aria-label="Sơ đồ: localhost kết nối qua tunnel tới internet">
+<pre>
+  <span class="hl-text">localhost:3000</span>  <span class="hl-dim">──</span><span class="hl-accent">tunnel</span><span class="hl-dim">──▶</span>  <span class="hl-text">VPS / Server</span>  <span class="hl-dim">──</span><span class="hl-accent">internet</span><span class="hl-dim">──▶</span>  <span class="hl-green">https://myapp.33.id.vn</span>
+
+  <span class="hl-dim">┌─────────────────┐              ┌───────────────┐              ┌──────────────────────┐</span>
+  <span class="hl-dim">│</span> <span class="hl-text">Máy của bạn</span>      <span class="hl-dim">│</span>  <span class="hl-accent">WebSocket</span>  <span class="hl-dim">│</span> <span class="hl-text">htn-server</span>    <span class="hl-dim">│</span>   <span class="hl-green">HTTPS / TCP</span>   <span class="hl-dim">│</span> <span class="hl-text">User trên internet</span>  <span class="hl-dim">│</span>
+  <span class="hl-dim">│</span> <span class="hl-text">htn-tunnel http</span> <span class="hl-dim">│ ◀──────────▶ │</span> <span class="hl-text">33.id.vn</span>      <span class="hl-dim">│ ◀───────────── │</span> <span class="hl-text">browser / API</span>       <span class="hl-dim">│</span>
+  <span class="hl-dim">└─────────────────┘              └───────────────┘              └──────────────────────┘</span>
+</pre>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     FEATURES
+════════════════════════════════════════════════════════ -->
+<section id="tinh-nang" class="section-border" aria-labelledby="features-heading">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">Tính năng</span>
+      <h2 class="section-title" id="features-heading">Mọi thứ bạn cần</h2>
+      <p class="section-desc">
+        Từ dev nhanh đến production-grade self-host — htn-tunnel lo hết.
+      </p>
+    </div>
+
+    <div class="features-grid">
+
+      <article class="feature-card fade-in">
+        <div class="feature-icon" aria-hidden="true">⚡</div>
+        <h3>Dùng ngay, không đăng ký</h3>
+        <p>Chạy <code>htn-tunnel http 3000</code> là xong. Không tài khoản, không cấu hình phức tạp.</p>
+      </article>
+
+      <article class="feature-card fade-in">
+        <div class="feature-icon" aria-hidden="true">🌐</div>
+        <h3>HTTP &amp; TCP Tunnels</h3>
+        <p>HTTPS subdomain routing cho web app. Raw TCP cho database, SSH, bất kỳ port nào.</p>
+      </article>
+
+      <article class="feature-card fade-in">
+        <div class="feature-icon" aria-hidden="true">🔐</div>
+        <h3>Browser Login</h3>
+        <p><code>htn-tunnel login</code> mở browser tự động. Đăng ký xong, key tự lưu — không cần copy paste.</p>
+      </article>
+
+      <article class="feature-card fade-in">
+        <div class="feature-icon" aria-hidden="true">📌</div>
+        <h3>Subdomain cố định</h3>
+        <p>Claim một lần, dùng mãi. <code>myapp.33.id.vn</code> luôn trỏ về máy bạn khi tunnel online.</p>
+      </article>
+
+      <article class="feature-card fade-in">
+        <div class="feature-icon" aria-hidden="true">📊</div>
+        <h3>Live Analytics Dashboard</h3>
+        <p>Request log real-time, traffic charts, status breakdown HTTP. Mở ngay bằng <code>htn-tunnel dashboard</code>.</p>
+      </article>
+
+      <article class="feature-card fade-in">
+        <div class="feature-icon" aria-hidden="true">🔒</div>
+        <h3>Auto-TLS (Let's Encrypt)</h3>
+        <p>Wildcard certificate tự động qua DNS-01 Cloudflare. Không cần cấu hình SSL thủ công.</p>
+      </article>
+
+      <article class="feature-card fade-in">
+        <div class="feature-icon" aria-hidden="true">🔌</div>
+        <h3>WebSocket Support</h3>
+        <p>Full proxy với Origin rewrite. HMR, dev server, Socket.IO — tất cả hoạt động ngay.</p>
+      </article>
+
+      <article class="feature-card fade-in">
+        <div class="feature-icon" aria-hidden="true">🛠️</div>
+        <h3>Self-Host Wizard</h3>
+        <p><code>htn-server init</code> — interactive setup, tự cấu hình nginx, SSL, systemd. Zero manual config.</p>
+      </article>
+
+      <article class="feature-card fade-in">
+        <div class="feature-icon" aria-hidden="true">♻️</div>
+        <h3>Auto-upgrade &amp; Backup</h3>
+        <p>Tự update từ GitHub Releases. Backup/restore dữ liệu để migrate server dễ dàng.</p>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     INSTALL
+════════════════════════════════════════════════════════ -->
+<section id="cai-dat" class="section-border install-section" aria-labelledby="install-heading">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">Cài đặt</span>
+      <h2 class="section-title" id="install-heading">Một lệnh là xong</h2>
+      <p class="section-desc">
+        Yêu cầu Node.js 16+. Hỗ trợ Windows, macOS, Linux.
+      </p>
+    </div>
+
+    <div class="fade-in">
+      <div class="install-box">
+        <span class="prompt" aria-hidden="true">$</span>
+        <code>npm install -g htn-tunnel</code>
+      </div>
+    </div>
+
+    <div class="fade-in" style="margin-top:24px;">
+      <p style="color:var(--text-secondary);font-size:14px;">
+        Hoặc tải binary thẳng từ
+        <a href="https://github.com/nhh0718/htn-tunnel/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
+        (không cần Node.js), hoặc
+        <code style="font-family:var(--mono);color:var(--green);font-size:13px;">go install github.com/nhh0718/htn-tunnel/cmd/htn-tunnel@latest</code>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     QUICK START — STEP BY STEP
+════════════════════════════════════════════════════════ -->
+<section id="huong-dan" class="section-border" aria-labelledby="quickstart-heading">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">Hướng dẫn</span>
+      <h2 class="section-title" id="quickstart-heading">Quick Start</h2>
+      <p class="section-desc">
+        Từ cài đặt đến tunnel đầu tiên — chưa đến 2 phút.
+      </p>
+    </div>
+
+    <div class="steps">
+
+      <!-- Step 1 -->
+      <div class="step fade-in">
+        <div class="step-num" aria-label="Bước 1">1</div>
+        <div class="step-body">
+          <h3>Cài đặt</h3>
+          <p class="step-hint">Cài htn-tunnel qua npm (Node.js 16+ required)</p>
+          <div class="code-block">
+            <button class="copy-btn" aria-label="Copy lệnh cài đặt">Copy</button>
+            <pre><span class="code-comment"># Cài đặt toàn cục</span>
+npm install -g htn-tunnel</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step fade-in">
+        <div class="step-num" aria-label="Bước 2">2</div>
+        <div class="step-body">
+          <h3>Kết nối server (chỉ làm 1 lần)</h3>
+          <p class="step-hint">Nhập địa chỉ server tunnel. Dùng server công cộng hoặc self-host của bạn.</p>
+          <div class="code-block">
+            <button class="copy-btn" aria-label="Copy lệnh setup">Copy</button>
+            <pre>htn-tunnel setup
+<span class="code-comment"># Nhập địa chỉ server: 33.id.vn:4443</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step fade-in">
+        <div class="step-num" aria-label="Bước 3">3</div>
+        <div class="step-body">
+          <h3>Tunnel ngay — không cần đăng ký</h3>
+          <p class="step-hint">Expose port local ra internet trong vài giây. Subdomain random, có hiệu lực 2 giờ.</p>
+          <div class="code-block">
+            <button class="copy-btn" aria-label="Copy lệnh tunnel HTTP">Copy</button>
+            <pre>htn-tunnel http 3000
+<span class="code-comment"># ✓ Tunnel online</span>
+<span class="code-arrow"># →</span> <span class="code-url">https://abc12xyz.33.id.vn</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step fade-in">
+        <div class="step-num" aria-label="Bước 4">4</div>
+        <div class="step-body">
+          <h3>Đăng ký để có subdomain cố định (tuỳ chọn)</h3>
+          <p class="step-hint">Login qua browser, claim subdomain theo ý muốn — dùng vĩnh viễn.</p>
+          <div class="code-block">
+            <button class="copy-btn" aria-label="Copy lệnh login và tunnel cố định">Copy</button>
+            <pre><span class="code-comment"># Đăng ký / đăng nhập — mở browser tự động</span>
+htn-tunnel login
+
+<span class="code-comment"># Tunnel với subdomain cố định</span>
+htn-tunnel http 3000:myapp
+<span class="code-arrow"># →</span> <span class="code-url">https://myapp.33.id.vn</span>  <span class="code-comment">(vĩnh viễn)</span></pre>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /steps -->
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CLI REFERENCE
+════════════════════════════════════════════════════════ -->
+<section id="cli-reference" class="section-border" aria-labelledby="cli-heading">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">CLI Reference</span>
+      <h2 class="section-title" id="cli-heading">Tất cả lệnh</h2>
+      <p class="section-desc">
+        Danh sách đầy đủ các lệnh htn-tunnel client.
+      </p>
+    </div>
+
+    <div class="table-wrap fade-in">
+      <table aria-label="Bảng CLI commands htn-tunnel">
+        <thead>
+          <tr>
+            <th scope="col">Lệnh</th>
+            <th scope="col">Mô tả</th>
+            <th scope="col">Khi nào dùng</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-cmd">htn-tunnel setup</td>
+            <td class="td-desc">Nhập địa chỉ server tunnel</td>
+            <td class="td-when">Lần đầu tiên</td>
+          </tr>
+          <tr>
+            <td class="td-cmd">htn-tunnel login</td>
+            <td class="td-desc">Đăng ký / đăng nhập qua browser, key tự lưu</td>
+            <td class="td-when">Khi muốn subdomain cố định</td>
+          </tr>
+          <tr>
+            <td class="td-cmd">htn-tunnel http 3000</td>
+            <td class="td-desc">Tunnel HTTP — random subdomain (hết hạn 2h)</td>
+            <td class="td-when">Dùng nhanh, không cần đăng ký</td>
+          </tr>
+          <tr>
+            <td class="td-cmd">htn-tunnel http 3000:ten</td>
+            <td class="td-desc">Tunnel HTTP — subdomain cố định theo tên</td>
+            <td class="td-when">Sau khi login</td>
+          </tr>
+          <tr>
+            <td class="td-cmd">htn-tunnel tcp 5432</td>
+            <td class="td-desc">Tunnel TCP — forward raw port (DB, SSH…)</td>
+            <td class="td-when">Sau khi login</td>
+          </tr>
+          <tr>
+            <td class="td-cmd">htn-tunnel status</td>
+            <td class="td-desc">Xem trạng thái tài khoản và tunnel đang hoạt động</td>
+            <td class="td-when">Kiểm tra nhanh</td>
+          </tr>
+          <tr>
+            <td class="td-cmd">htn-tunnel dashboard</td>
+            <td class="td-desc">Mở dashboard analytics trên browser</td>
+            <td class="td-when">Quản lý &amp; xem traffic</td>
+          </tr>
+          <tr>
+            <td class="td-cmd">htn-tunnel logout</td>
+            <td class="td-desc">Xóa API key đã lưu khỏi máy</td>
+            <td class="td-when">Đổi tài khoản</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     EXAMPLES
+════════════════════════════════════════════════════════ -->
+<section id="vi-du" class="section-border" aria-labelledby="examples-heading">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">Ví dụ</span>
+      <h2 class="section-title" id="examples-heading">Use cases thực tế</h2>
+      <p class="section-desc">
+        Từ web app đến database — tunnel đúng loại cho đúng mục đích.
+      </p>
+    </div>
+
+    <div class="code-block fade-in">
+      <button class="copy-btn" aria-label="Copy examples">Copy</button>
+      <pre><span class="code-comment"># Web app dev — subdomain cố định (sau khi login)</span>
+htn-tunnel http 3000:myapp     <span class="code-arrow">#</span> <span class="code-url">→ https://myapp.33.id.vn</span>
+
+<span class="code-comment"># API server</span>
+htn-tunnel http 8080:api       <span class="code-arrow">#</span> <span class="code-url">→ https://api.33.id.vn</span>
+
+<span class="code-comment"># Database remote access (TCP)</span>
+htn-tunnel tcp 5432            <span class="code-arrow">#</span> <span class="code-url">→ tcp://33.id.vn:xxxxx</span>
+
+<span class="code-comment"># SSH tunnel</span>
+htn-tunnel tcp 22              <span class="code-arrow">#</span> <span class="code-url">→ tcp://33.id.vn:yyyyy</span>
+
+<span class="code-comment"># Quick share — không cần đăng ký (hết hạn 2h)</span>
+htn-tunnel http 3000           <span class="code-arrow">#</span> <span class="code-url">→ https://abc12xyz.33.id.vn</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     SELF-HOST
+════════════════════════════════════════════════════════ -->
+<section id="self-host" class="section-border" aria-labelledby="selfhost-heading">
+  <div class="container">
+    <div class="fade-in">
+      <span class="section-label">Self-Host</span>
+      <h2 class="section-title" id="selfhost-heading">Chạy server của riêng bạn</h2>
+      <p class="section-desc">
+        Cần một VPS, một domain, và 3 bước. Wizard tự lo phần còn lại.
+      </p>
+    </div>
+
+    <div class="selfhost-steps">
+
+      <div class="selfhost-step fade-in">
+        <div class="sh-num">Bước 01</div>
+        <h3>Tải binary server</h3>
+        <p>Download <code>htn-server</code> cho hệ điều hành của VPS từ GitHub Releases.</p>
+        <div class="code-block">
+          <button class="copy-btn" aria-label="Copy lệnh tải server">Copy</button>
+          <pre><span class="code-comment"># Linux x64</span>
+curl -Lo htn-server \
+  https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-server-linux-amd64
+chmod +x htn-server
+sudo mv htn-server /usr/local/bin/</pre>
+        </div>
+      </div>
+
+      <div class="selfhost-step fade-in">
+        <div class="sh-num">Bước 02</div>
+        <h3>Chạy wizard setup</h3>
+        <p>Interactive wizard cấu hình domain, SSL, nginx, tạo systemd service — tự động hoàn toàn.</p>
+        <div class="code-block">
+          <button class="copy-btn" aria-label="Copy lệnh init server">Copy</button>
+          <pre>sudo htn-server init
+<span class="code-comment"># Nhập domain, Cloudflare API key
+# Wizard tự cài nginx + SSL + service</span></pre>
+        </div>
+      </div>
+
+      <div class="selfhost-step fade-in">
+        <div class="sh-num">Bước 03</div>
+        <h3>Chia sẻ với team</h3>
+        <p>Server đã chạy. Đồng đội chỉ cần setup địa chỉ server của bạn là dùng được ngay.</p>
+        <div class="code-block">
+          <button class="copy-btn" aria-label="Copy lệnh setup client">Copy</button>
+          <pre><span class="code-comment"># Trên máy đồng đội</span>
+htn-tunnel setup
+<span class="code-comment"># Nhập: your-domain.com:4443</span></pre>
+        </div>
+      </div>
+
+    </div><!-- /selfhost-steps -->
+
+    <!-- Server CLI reference -->
+    <div class="fade-in">
+      <h3 style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:20px;">
+        Server CLI Reference
+      </h3>
+      <div class="table-wrap">
+        <table aria-label="Bảng CLI commands htn-server">
+          <thead>
+            <tr>
+              <th scope="col">Lệnh</th>
+              <th scope="col">Mô tả</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="td-cmd">htn-server init</td>
+              <td class="td-desc">Interactive wizard: cấu hình domain, SSL, nginx, systemd</td>
+            </tr>
+            <tr>
+              <td class="td-cmd">htn-server start</td>
+              <td class="td-desc">Khởi động tunnel server</td>
+            </tr>
+            <tr>
+              <td class="td-cmd">htn-server status</td>
+              <td class="td-desc">Xem trạng thái server và các tunnel đang hoạt động</td>
+            </tr>
+            <tr>
+              <td class="td-cmd">htn-server upgrade</td>
+              <td class="td-desc">Tự động update server lên phiên bản mới nhất</td>
+            </tr>
+            <tr>
+              <td class="td-cmd">htn-server backup</td>
+              <td class="td-desc">Tạo backup toàn bộ dữ liệu (users, keys, config)</td>
+            </tr>
+            <tr>
+              <td class="td-cmd">htn-server restore</td>
+              <td class="td-desc">Restore từ backup — dùng khi migrate server</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════ -->
+<footer role="contentinfo">
+  <div class="footer-inner">
+    <span class="footer-logo">htn-tunnel</span>
+
+    <ul class="footer-links" role="list">
+      <li>
+        <a href="https://github.com/nhh0718/htn-tunnel"
+           target="_blank" rel="noopener noreferrer">GitHub</a>
+      </li>
+      <li>
+        <a href="https://www.npmjs.com/package/htn-tunnel"
+           target="_blank" rel="noopener noreferrer">npm</a>
+      </li>
+      <li>
+        <a href="https://github.com/nhh0718/htn-tunnel/blob/main/LICENSE"
+           target="_blank" rel="noopener noreferrer">MIT License</a>
+      </li>
+      <li>
+        <a href="https://github.com/nhh0718/htn-tunnel/releases"
+           target="_blank" rel="noopener noreferrer">Releases</a>
+      </li>
+    </ul>
+
+    <p class="footer-copy">
+      &copy; 2024 htn-tunnel · MIT License
+    </p>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
