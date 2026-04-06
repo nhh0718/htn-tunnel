@@ -49,10 +49,12 @@ type Server struct {
 	tcpProxy       *TCPProxy
 	requestLog     *RequestLog
 	listener       net.Listener
+	version        string
 }
 
 // NewServer creates a Server from cfg. configPath is the yaml file path for config editing.
-func NewServer(cfg *config.ServerConfig, configPath string) (*Server, error) {
+// version is the build version string injected via ldflags (e.g. "1.2.3").
+func NewServer(cfg *config.ServerConfig, configPath, version string) (*Server, error) {
 	ts, err := NewTokenStore(cfg.Tokens, cfg.MaxTunnelsPerToken)
 	if err != nil {
 		return nil, fmt.Errorf("init token store: %w", err)
@@ -79,6 +81,7 @@ func NewServer(cfg *config.ServerConfig, configPath string) (*Server, error) {
 		httpProxy:      NewHTTPProxy(cfg, tm, rl),
 		tcpProxy:       tcp,
 		requestLog:     rl,
+		version:        version,
 	}, nil
 }
 
@@ -91,7 +94,7 @@ func (s *Server) startDashboard(ctx context.Context) {
 		return
 	}
 	rlAdapter := NewRequestLogAdapter(s.requestLog)
-	h := dashboard.NewHandler(s.tunnelManager, NewKeyStoreAdapter(s.keyStore), s.configProvider, s.cfg.AdminToken, s.cfg.Domain, rlAdapter)
+	h := dashboard.NewHandler(s.tunnelManager, NewKeyStoreAdapter(s.keyStore), s.configProvider, s.cfg.AdminToken, s.cfg.Domain, s.version, rlAdapter)
 	srv := &http.Server{
 		Addr:    s.cfg.DashboardAddr,
 		Handler: h,

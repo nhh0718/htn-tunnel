@@ -123,13 +123,14 @@ type Handler struct {
 	requestLog  RequestLogProvider
 	adminToken  string
 	domain      string
+	version     string
 	mux         *http.ServeMux
 }
 
 // NewHandler creates a Handler and registers all routes.
 // requestLog may be nil; analytics endpoints will return empty results when nil.
 func NewHandler(tunnels TunnelProvider, keys KeyProvider, config ConfigProvider,
-	adminToken, domain string, requestLog RequestLogProvider) *Handler {
+	adminToken, domain, version string, requestLog RequestLogProvider) *Handler {
 	h := &Handler{
 		tunnels:    tunnels,
 		keys:       keys,
@@ -137,6 +138,7 @@ func NewHandler(tunnels TunnelProvider, keys KeyProvider, config ConfigProvider,
 		requestLog: requestLog,
 		adminToken: adminToken,
 		domain:     domain,
+		version:    version,
 		mux:        http.NewServeMux(),
 	}
 	h.registerRoutes()
@@ -182,6 +184,9 @@ func (h *Handler) registerRoutes() {
 	h.mux.HandleFunc("GET /_admin/api/stats/top-paths", h.adminOnly(h.handleAdminTopPaths))
 	// SSE: auth via ?key= query param.
 	h.mux.HandleFunc("GET /_admin/api/logs/stream", h.handleAdminLogStream)
+
+	// --- Health endpoint (no auth — monitoring tools need unauthenticated access) ---
+	h.mux.HandleFunc("GET /_healthz", h.handleHealthz)
 
 	// --- Static files ---
 	userFS, _ := fs.Sub(staticFiles, "static/user")
@@ -297,6 +302,21 @@ func (h *Handler) handleRemoveSubdomain(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) handleUserTunnels(w http.ResponseWriter, r *http.Request) {
 	keyID := r.Context().Value(ctxKeyID).(string)
 	writeJSON(w, h.tunnels.TunnelsForToken(keyID))
+}
+
+// --- Health Handler ---
+
+func (h *Handler) handleHealthz(w http.ResponseWriter, r *http.Request) {
+	stats := h.tunnels.StatsForDashboard()
+	keys := h.keys.ListKeys()
+	writeJSON(w, map[string]any{
+		"status":    "ok",
+		"version":   h.version,
+		"tunnels":   stats.TotalTunnels,
+		"users":     len(keys),
+		"bytes_in":  stats.BytesIn,
+		"bytes_out": stats.BytesOut,
+	})
 }
 
 // --- Admin API Handlers ---

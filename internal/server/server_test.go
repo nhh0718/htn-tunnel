@@ -45,7 +45,7 @@ func startLocalServer(t *testing.T, tokens []string) (string, context.CancelFunc
 		DevMode:            true,
 	}
 
-	srv, err := NewServer(cfg, "")
+	srv, err := NewServer(cfg, "", "test")
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}

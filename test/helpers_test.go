@@ -41,7 +41,7 @@ func startTestServer(t *testing.T) (*server.Server, *config.ServerConfig, contex
 		DashboardEnabled:   false,
 	}
 
-	srv, err := server.NewServer(cfg, "")
+	srv, err := server.NewServer(cfg, "", "test")
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
