@@ -35,7 +35,7 @@ func main() {
 	root.PersistentFlags().StringVar(&flagServer, "server", "", "server address (host:port)")
 	root.PersistentFlags().StringVar(&flagToken, "token", "", "override auth token")
 
-	root.AddCommand(httpCmd(), tcpCmd(), authCmd(), loginCmd(), logoutCmd(), dashboardCmd(), statusCmd())
+	root.AddCommand(httpCmd(), tcpCmd(), authCmd(), loginCmd(), logoutCmd(), dashboardCmd(), statusCmd(), setupCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -66,9 +66,12 @@ func httpCmd() *cobra.Command {
 				return err
 			}
 
-			// Custom subdomain requires auth — auto-trigger login if no token.
+			// Custom subdomain requires auth — ensure server + auto-trigger login.
 			if sub != "" && cfg.Token == "" {
-				fmt.Println("\n  Cần đăng ký để dùng subdomain cố định.")
+				if !ensureServer(cfg) {
+					return fmt.Errorf("cần server address. Chạy: htn-tunnel setup")
+				}
+				fmt.Printf("\n  Cần đăng ký để dùng subdomain cố định.\n")
 				if err := runLogin(cfg); err != nil {
 					return err
 				}
@@ -223,6 +226,9 @@ func loginCmd() *cobra.Command {
 		Short: "Đăng ký hoặc đăng nhập qua browser",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, _ := loadClientCfg()
+			if !ensureServer(cfg) {
+				return fmt.Errorf("cần server address. Chạy: htn-tunnel setup")
+			}
 			return runLogin(cfg)
 		},
 	}
@@ -431,6 +437,64 @@ func logoutCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// setupCmd implements: htn-tunnel setup — configure server address interactively.
+func setupCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "setup",
+		Short: "Cấu hình kết nối đến server",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, _ := loadClientCfg()
+			fmt.Printf("\n  htn-tunnel Setup\n\n")
+			if cfg.ServerAddr != "" && cfg.ServerAddr != "localhost:4443" {
+				fmt.Printf("  Server hiện tại: %s\n", cfg.ServerAddr)
+			}
+			fmt.Printf("  Nhập server address (VD: tunnel.myteam.com:4443): ")
+			scanner := bufio.NewScanner(os.Stdin)
+			if scanner.Scan() {
+				addr := strings.TrimSpace(scanner.Text())
+				if addr != "" {
+					// Add default port if missing.
+					if !strings.Contains(addr, ":") {
+						addr += ":4443"
+					}
+					cfg.ServerAddr = addr
+					if err := config.SaveClientConfig(cfg); err != nil {
+						return fmt.Errorf("save config: %w", err)
+					}
+					fmt.Printf("\n  ✓ Server đã lưu: %s\n", cfg.ServerAddr)
+					fmt.Printf("  Config: ~/.htn-tunnel/config.yaml\n\n")
+					fmt.Printf("  Bước tiếp: htn-tunnel login\n\n")
+					return nil
+				}
+			}
+			return fmt.Errorf("không nhận được địa chỉ server")
+		},
+	}
+}
+
+// ensureServer checks if server is configured; if still default localhost, prompts the user.
+// Returns true if server is properly configured.
+func ensureServer(cfg *config.ClientConfig) bool {
+	if cfg.ServerAddr != "" && cfg.ServerAddr != "localhost:4443" {
+		return true
+	}
+	fmt.Printf("\n  Chưa cấu hình server. Nhập server address (VD: tunnel.myteam.com:4443): ")
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		addr := strings.TrimSpace(scanner.Text())
+		if addr != "" {
+			if !strings.Contains(addr, ":") {
+				addr += ":4443"
+			}
+			cfg.ServerAddr = addr
+			_ = config.SaveClientConfig(cfg)
+			fmt.Printf("  ✓ Server: %s\n\n", cfg.ServerAddr)
+			return true
+		}
+	}
+	return false
 }
 
 func joinOrNone(ss []string) string {
