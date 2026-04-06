@@ -47,7 +47,10 @@ localhost:3000  ──tunnel──▶  Your VPS  ──internet──▶  https:
 | **Live analytics** | Real-time request log, traffic charts, status breakdown |
 | **User dashboard** | Register, manage subdomains, view traffic |
 | **Admin dashboard** | Manage users, tunnels, server config, analytics |
+| **1-command setup** | `htn-server init` — interactive wizard, zero manual config |
 | **Auto-reconnect** | Heartbeat + exponential backoff |
+| **Self-upgrade** | `htn-server upgrade` — auto-update from GitHub Releases |
+| **Backup/restore** | `htn-server backup` / `restore` for migration |
 | **Single binary** | No dependencies, cross-platform |
 
 ---
@@ -189,15 +192,44 @@ htn-tunnel server:
 
 ---
 
-## Server Setup
+## Self-Host Your Own Server
 
-See **[Deployment Guide](docs/deployment-guide.md)** for full instructions.
+### Quick setup (1 command)
 
 ```bash
-GOOS=linux GOARCH=amd64 go build -o htn-server ./cmd/server
-scp htn-server root@your-vps:/usr/local/bin/
-# See deployment guide for server.yaml, systemd, nginx, DNS
+# Download server binary
+curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-server_linux_amd64.tar.gz | tar xz
+sudo mv htn-server /usr/local/bin/
+
+# Interactive wizard — sets up everything
+sudo htn-server init
 ```
+
+The wizard asks domain, email, Cloudflare token, admin password, then automatically:
+- Validates DNS (checks `*.your-domain` → your server IP)
+- Generates `/etc/htn-tunnel/server.yaml`
+- Creates systemd service
+- Starts server + requests wildcard TLS cert
+
+### Server CLI
+
+```
+htn-server              Start server (default)
+htn-server init         Interactive setup wizard
+htn-server health       Check server health
+htn-server status       Show config + live stats
+htn-server upgrade      Self-update to latest version
+htn-server backup       Export config + keys to tar.gz
+htn-server restore <f>  Restore from backup file
+```
+
+### Prerequisites
+
+- VPS with public IP (Ubuntu/Debian recommended)
+- Domain with Cloudflare DNS (free tier works)
+- Wildcard DNS record: `*.tunnel.yourdomain.com → your-server-ip`
+
+See **[Deployment Guide](docs/deployment-guide.md)** for advanced setup (nginx, Docker, manual config).
 
 ---
 
@@ -248,7 +280,10 @@ Máy bạn (localhost:3000)  ──tunnel──▶  VPS  ──internet──▶
 | **Analytics trực tiếp** | Request log real-time, biểu đồ traffic, phân tích status |
 | **User dashboard** | Đăng ký, quản lý subdomain, xem traffic |
 | **Admin dashboard** | Quản lý users, tunnels, config, analytics |
+| **1 lệnh cài server** | `htn-server init` — wizard tương tác, không cần config thủ công |
 | **Tự động kết nối lại** | Heartbeat + exponential backoff |
+| **Tự nâng cấp** | `htn-server upgrade` — tự tải bản mới từ GitHub |
+| **Sao lưu/phục hồi** | `htn-server backup` / `restore` để migrate |
 | **Single binary** | Không cần cài thêm gì, chạy mọi nền tảng |
 
 ---
@@ -371,6 +406,47 @@ htn-tunnel auth <key>  [--server host:port]  Lưu API key thủ công
 **User dashboard:** đăng ký, quản lý subdomain, request log real-time, biểu đồ traffic, top paths
 
 **Admin dashboard:** quản lý users/tunnels, sửa config, analytics toàn server với live log stream
+
+---
+
+## Tự Host Server
+
+### Cài đặt nhanh (1 lệnh)
+
+```bash
+# Tải binary
+curl -L https://github.com/nhh0718/htn-tunnel/releases/latest/download/htn-server_linux_amd64.tar.gz | tar xz
+sudo mv htn-server /usr/local/bin/
+
+# Wizard tương tác — tự cài đặt mọi thứ
+sudo htn-server init
+```
+
+Wizard hỏi domain, email, Cloudflare token, mật khẩu admin, rồi tự động:
+- Kiểm tra DNS (`*.domain` → IP server)
+- Tạo config `/etc/htn-tunnel/server.yaml`
+- Tạo systemd service
+- Khởi động server + xin chứng chỉ TLS wildcard
+
+### Server CLI
+
+```
+htn-server              Khởi động server (mặc định)
+htn-server init         Wizard cài đặt tương tác
+htn-server health       Kiểm tra sức khỏe server
+htn-server status       Xem config + thống kê
+htn-server upgrade      Tự cập nhật phiên bản mới
+htn-server backup       Sao lưu config + keys
+htn-server restore <f>  Phục hồi từ file backup
+```
+
+### Yêu cầu
+
+- VPS có IP public (khuyên dùng Ubuntu/Debian)
+- Domain trên Cloudflare DNS (free tier OK)
+- Bản ghi DNS wildcard: `*.tunnel.domain.com → IP-server`
+
+Xem **[Deployment Guide](docs/deployment-guide.md)** cho hướng dẫn nâng cao (nginx, Docker, config thủ công).
 
 ---
 
