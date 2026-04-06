@@ -40,7 +40,7 @@ func runStatus() error {
 	// Probe live server via healthz endpoint.
 	addr := cfg.DashboardAddr
 	if addr == "" {
-		addr = ":8080"
+		addr = ":1807"
 	}
 	if addr[0] == ':' {
 		addr = "localhost" + addr
@@ -74,12 +74,12 @@ func healthCmd() *cobra.Command {
 			cfg, err := config.LoadServerConfig(resolveConfigPath())
 			if err != nil {
 				// Fall back to default dashboard addr when config is missing.
-				cfg = &config.ServerConfig{DashboardAddr: ":8080"}
+				cfg = &config.ServerConfig{DashboardAddr: ":1807"}
 			}
 
 			addr := cfg.DashboardAddr
 			if addr == "" {
-				addr = ":8080"
+				addr = ":1807"
 			}
 			// Ensure addr has a host for http.Get.
 			if addr[0] == ':' {

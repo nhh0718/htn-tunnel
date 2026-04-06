@@ -79,7 +79,7 @@ func (c *ServerConfig) defaults() {
 		c.CertStorage = "/var/lib/htn-tunnel/certs"
 	}
 	if c.DashboardAddr == "" {
-		c.DashboardAddr = ":8080"
+		c.DashboardAddr = ":1807"
 	}
 	if c.HTTPProxyAddr == "" {
 		c.HTTPProxyAddr = ":443"

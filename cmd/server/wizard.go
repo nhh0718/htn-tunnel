@@ -147,7 +147,7 @@ listen_addr: ":4443"
 http_proxy_addr: ":443"
 http_redirect_addr: ":80"
 dashboard_enabled: true
-dashboard_addr: ":8080"
+dashboard_addr: ":1807"
 dns_provider: cloudflare
 dns_api_token: %s
 admin_token: %s
