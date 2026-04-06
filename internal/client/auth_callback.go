@@ -29,6 +29,7 @@ func StartCallbackServer(ctx context.Context) (callbackURL string, resultCh <-ch
 	callbackURL = fmt.Sprintf("http://127.0.0.1:%d/cb", port)
 
 	ch := make(chan CallbackResult, 1)
+	done := make(chan struct{}) // separate shutdown signal
 	mux := http.NewServeMux()
 	mux.HandleFunc("/cb", func(w http.ResponseWriter, r *http.Request) {
 		key := r.URL.Query().Get("key")
@@ -43,6 +44,11 @@ func StartCallbackServer(ctx context.Context) (callbackURL string, resultCh <-ch
 		case ch <- CallbackResult{Key: key, Name: name}:
 		default:
 		}
+		// Signal shutdown without consuming the result channel.
+		select {
+		case done <- struct{}{}:
+		default:
+		}
 	})
 
 	srv := &http.Server{Handler: mux}
@@ -50,7 +56,7 @@ func StartCallbackServer(ctx context.Context) (callbackURL string, resultCh <-ch
 	go func() {
 		select {
 		case <-ctx.Done():
-		case <-ch:
+		case <-done:
 		}
 		srv.Close()
 	}()
