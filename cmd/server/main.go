@@ -21,7 +21,7 @@ func main() {
 	root.PersistentFlags().StringVarP(&flagConfig, "config", "c", "", "path to server.yaml")
 
 	serve := serveCmd()
-	root.AddCommand(serve, initCmd(), healthCmd())
+	root.AddCommand(serve, initCmd(), healthCmd(), statusCmd(), upgradeCmd(), backupCmd(), restoreCmd())
 
 	// Default to serve when no subcommand is provided.
 	root.RunE = serve.RunE
