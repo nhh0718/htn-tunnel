@@ -234,8 +234,14 @@ func (p *HTTPProxy) proxyWebSocket(w http.ResponseWriter, r *http.Request, ts *T
 		_, _ = stream.Write(buffered)
 	}
 
-	// Read the server's upgrade response from the stream and forward to client.
-	resp, err := http.ReadResponse(bufio.NewReader(stream), r)
+	// Read the server's upgrade response from the stream.
+	// bufio.NewReader may buffer data BEYOND the HTTP response headers (e.g. the
+	// first WebSocket frame from the backend). We must flush that buffered data to
+	// the client before starting the raw bidirectional proxy, otherwise the initial
+	// frame is silently lost — causing Socket.IO/Engine.IO handshake failures where
+	// the client receives a ping (0x32) instead of the expected open (0x30) packet.
+	br := bufio.NewReader(stream)
+	resp, err := http.ReadResponse(br, r)
 	if err != nil {
 		slog.Warn("WebSocket: read upgrade response failed", "err", err)
 		return
@@ -244,6 +250,17 @@ func (p *HTTPProxy) proxyWebSocket(w http.ResponseWriter, r *http.Request, ts *T
 	if err := resp.Write(clientConn); err != nil {
 		slog.Warn("WebSocket: write response to client failed", "err", err)
 		return
+	}
+
+	// Flush any WebSocket frames already buffered during HTTP response parsing.
+	if n := br.Buffered(); n > 0 {
+		buf := make([]byte, n)
+		n, _ = io.ReadFull(br, buf)
+		if _, err := clientConn.Write(buf[:n]); err != nil {
+			slog.Warn("WebSocket: flush buffered data failed", "err", err)
+			return
+		}
+		slog.Debug("WebSocket: flushed buffered data", "bytes", n)
 	}
 
 	slog.Info("WebSocket: proxying started", "path", r.URL.Path)
