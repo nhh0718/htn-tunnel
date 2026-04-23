@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kiến trúc htn-tunnel — Cách xây dựng một hệ thống tunnel từ đầu</title>
+  <meta name="description" content="Bóc tách từng tầng kiến trúc htn-tunnel: TLS handshake, yamux multiplexing, SNI routing, WebSocket proxy, DNS-01 wildcard cert. Dành cho developer muốn tự xây tunneling tool." />
+  <meta name="keywords" content="htn-tunnel, kiến trúc, tunnel architecture, yamux, SNI, TLS, reverse proxy, Go, self-hosted tunnel" />
+  <meta name="author" content="htn-tunnel" />
+
+  <meta property="og:type"        content="article" />
+  <meta property="og:title"       content="Kiến trúc htn-tunnel — Cách xây dựng một hệ thống tunnel từ đầu" />
+  <meta property="og:description" content="Bóc tách từng tầng: TLS handshake, yamux multiplexing, SNI routing, WebSocket proxy. Dành cho developer muốn tự build tunneling tool." />
+  <meta property="og:url"         content="https://nhh0718.github.io/htn-tunnel/architecture/" />
+
+  <meta name="twitter:card"        content="summary" />
+  <meta name="twitter:title"       content="Kiến trúc htn-tunnel — Deep Dive" />
+  <meta name="twitter:description" content="Bóc tách từng tầng kiến trúc htn-tunnel: yamux, SNI, TLS, WebSocket, DNS-01." />
+
+  <link rel="canonical" href="https://nhh0718.github.io/htn-tunnel/architecture/" />
+  <link rel="stylesheet" href="../style.css" />
+  <link rel="stylesheet" href="article.css" />
+</head>
+<body>
+
+<!-- Reading progress bar -->
+<div class="reading-progress" aria-hidden="true">
+  <div class="reading-progress-bar"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     NAV
+════════════════════════════════════════════════════════ -->
+<nav class="nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="../" class="nav-logo" aria-label="htn-tunnel trang chủ">
+      <span class="logo-dot" aria-hidden="true"></span>
+      htn-tunnel
+    </a>
+
+    <ul class="nav-links" role="list">
+      <li><a href="../docs/">Docs</a></li>
+      <li><a href="./" aria-current="page" class="arch-active">Kiến trúc</a></li>
+      <li>
+        <a href="https://github.com/nhh0718/htn-tunnel" class="nav-github"
+           target="_blank" rel="noopener noreferrer">GitHub</a>
+      </li>
+    </ul>
+
+    <button class="nav-hamburger" id="hamburger"
+            aria-label="Mở menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile nav drawer -->
+<div class="nav-drawer" id="nav-drawer" role="dialog" aria-label="Mobile menu">
+  <ul>
+    <li><a href="../">Trang chủ</a></li>
+    <li><a href="../docs/">Docs</a></li>
+    <li><a href="./">Kiến trúc</a></li>
+    <li><a href="https://github.com/nhh0718/htn-tunnel" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+  </ul>
+</div>
+
+<main>
+<div class="article-layout">
+
+  <!-- ═══════════════════════════════════════════════════
+       ARTICLE HEADER
+  ════════════════════════════════════════════════════ -->
+  <header class="article-header">
+    <span class="article-label">Deep Dive · Kiến trúc hệ thống</span>
+    <h1 class="article-title">Kiến trúc htn-tunnel<br/>Cách xây dựng một hệ thống tunnel từ đầu</h1>
+    <p class="article-subtitle">
+      Bóc tách từng tầng: từ TLS handshake đến yamux multiplexing, cách một byte
+      đi từ browser đến <code>localhost:3000</code> — và những bẫy tinh vi trên đường đi.
+    </p>
+    <div class="article-meta">
+      <span>15 phút đọc</span>
+      <span class="meta-dot" aria-hidden="true"></span>
+      <span>Cập nhật 2026-04-23</span>
+      <span class="meta-dot" aria-hidden="true"></span>
+      <span>Go · yamux · TLS · WebSocket</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════
+       MOBILE TOC
+  ════════════════════════════════════════════════════ -->
+  <button class="toc-mobile-toggle" id="toc-toggle" aria-expanded="false" aria-controls="toc-mobile-body">
+    Mục lục bài viết <span class="toc-arrow" aria-hidden="true">▼</span>
+  </button>
+  <nav class="toc-mobile-body" id="toc-mobile-body" aria-label="Mục lục bài viết (mobile)">
+    <ul class="toc-list">
+      <li><a href="#tong-quan">1. Tổng quan</a></li>
+      <li><a href="#kien-truc-tong-the">2. Kiến trúc tổng thể</a></li>
+      <li><a href="#control-plane">3. Control Plane</a></li>
+      <li><a href="#wire-protocol">4. Wire Protocol</a></li>
+      <li><a href="#yamux">5. Yamux Multiplexing</a></li>
+      <li><a href="#http-proxy">6. HTTP Proxy</a></li>
+      <li><a href="#tcp-proxy">7. TCP Proxy</a></li>
+      <li><a href="#websocket">8. WebSocket</a></li>
+      <li><a href="#tls-wildcard">9. TLS Wildcard Cert</a></li>
+      <li><a href="#auth-rate-limit">10. Auth &amp; Rate Limit</a></li>
+      <li><a href="#dashboard">11. Dashboard &amp; Analytics</a></li>
+      <li><a href="#request-flow">12. Full Request Flow</a></li>
+      <li><a href="#takeaways">13. Key Takeaways</a></li>
+    </ul>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════
+       ARTICLE CONTENT
+  ════════════════════════════════════════════════════ -->
+  <article class="article-content" aria-labelledby="article-main-title">
+    <span id="article-main-title" class="sr-only">Kiến trúc htn-tunnel</span>
+
+    <!-- ─── 1. TỔNG QUAN ─────────────────────────────── -->
+    <h2 id="tong-quan"><span class="h2-num">01</span> Tổng quan</h2>
+
+    <p>
+      Bài toán cốt lõi của tunnel là đơn giản: bạn đang phát triển một web app trên
+      <code>localhost:3000</code> và cần share link cho khách hàng, teammate, hoặc webhook
+      của bên thứ ba gọi vào. Vấn đề là máy bạn nằm sau NAT — không có IP public, không có
+      port forwarding, không thể nhận kết nối từ bên ngoài.
+    </p>
+
+    <p>Có ba cách tiếp cận phổ biến:</p>
+
+    <ul>
+      <li>
+        <strong>SSH reverse tunnel</strong> (<code>ssh -R 8080:localhost:3000 user@vps</code>) —
+        đơn giản, có sẵn, nhưng không HTTP-friendly: không có TLS, không có custom domain,
+        không parse được HTTP headers để routing.
+      </li>
+      <li>
+        <strong>VPN</strong> (WireGuard, Tailscale) — mạnh nhưng overkill cho use case này.
+        VPN kết nối mạng, không per-port. Phải cấu hình phức tạp hơn.
+      </li>
+      <li>
+        <strong>Reverse proxy tunnel</strong> (ngrok, cloudflared, htn-tunnel) — chuyên biệt
+        cho bài toán này. HTTPS endpoint ngay lập tức, custom subdomain, dashboard analytics.
+      </li>
+    </ul>
+
+    <p>
+      htn-tunnel thuộc nhóm thứ ba, nhưng là self-hosted — bạn chạy server trên VPS của mình,
+      toàn quyền kiểm soát. Ba yêu cầu cốt lõi quyết định toàn bộ kiến trúc:
+    </p>
+
+    <ol>
+      <li>
+        <strong>Client-initiated connection</strong> — client (máy dev của bạn) phải là bên
+        chủ động kết nối đến server, vì client sau NAT không thể nhận inbound connection.
+        Server không bao giờ dial ngược lại client.
+      </li>
+      <li>
+        <strong>Multiplexing</strong> — mỗi HTTP request từ browser phải được forward song song
+        mà không cần mở lại TCP connection mới (quá chậm). Cần một cơ chế ghép nhiều logical
+        stream trên cùng một TCP connection.
+      </li>
+      <li>
+        <strong>Public HTTPS endpoint</strong> — browser hiện đại bắt buộc HTTPS. Cần wildcard
+        TLS cert cho <code>*.tunnel.example.com</code> để routing theo subdomain hoạt động.
+      </li>
+    </ol>
+
+    <p>
+      Toàn bộ kiến trúc htn-tunnel xoay quanh ba ràng buộc này. Mỗi quyết định thiết kế
+      đều có thể trace ngược về một trong ba yêu cầu trên.
+    </p>
+
+    <!-- ─── 2. KIẾN TRÚC TỔNG THỂ ───────────────────── -->
+    <h2 id="kien-truc-tong-the"><span class="h2-num">02</span> Kiến trúc tổng thể</h2>
+
+    <p>
+      Server có ba entry point riêng biệt, mọi thứ đều routing qua một registry trung tâm —
+      <code>TunnelManager</code>. Client duy trì một TCP connection duy nhất nhưng tạo nhiều
+      logical stream song song qua yamux.
+    </p>
+
+<pre class="diagram" role="img" aria-label="Sơ đồ kiến trúc tổng thể htn-tunnel">
+                        Internet
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+ <span class="d-green">Browser/HTTPS</span>      <span class="d-accent">Client (Yamux)</span>       <span class="d-yellow">Admin/Dashboard</span>
+    <span class="d-text">:443</span>              <span class="d-text">:4443</span>                 <span class="d-text">:1807</span>
+      │                 │                     │
+ ┌────┴────┐       ┌────┴────┐          ┌─────┴────┐
+ │   SNI   │       │  TLS    │          │  HTTP    │
+ │Extractor│       │  + Auth │          │  Server  │
+ └────┬────┘       └────┬────┘          └─────┬────┘
+      │                 │                     │
+      ▼                 ▼                     ▼
+ ┌──────────────────────────────────────────────────┐
+ │           <span class="d-text">TunnelManager (registry)</span>              │
+ │  httpTunnels[subdomain] → TunnelSession          │
+ │  tcpTunnels[port]       → TunnelSession          │
+ └──────────────────┬───────────────────────────────┘
+                    │
+                    ▼
+           ┌────────────────┐
+           │  <span class="d-accent">Yamux Session</span>  │  ◄── nhiều stream
+           │  (per client)  │      song song
+           └────────┬───────┘
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │     <span class="d-green">Tunnel Client</span>     │
+        │  (máy dev của user)   │
+        └───────────┬───────────┘
+                    │
+                    ▼
+              <span class="d-green">localhost:3000</span>
+               (app của user)</pre>
+
+    <p>
+      Port <strong>443</strong> nhận HTTPS từ browser — SNI extractor đọc server name từ TLS
+      ClientHello để biết subdomain nào được yêu cầu, không cần decrypt toàn bộ payload.
+      Port <strong>4443</strong> là control port — client kết nối vào đây, xác thực, rồi duy
+      trì yamux session. Port <strong>1807</strong> là dashboard web — API và SSE stream cho
+      admin UI.
+    </p>
+
+    <!-- ─── 3. CONTROL PLANE ─────────────────────────── -->
+    <h2 id="control-plane"><span class="h2-num">03</span> Tầng 1: Control Plane</h2>
+
+    <p>
+      Control plane là bước đầu tiên khi client kết nối — thiết lập session, xác thực, và
+      mở yamux trước khi bất kỳ tunnel nào được tạo.
+    </p>
+
+    <h3>Handshake flow từng bước</h3>
+
+    <ol>
+      <li>
+        <strong>Client dial TLS</strong> tới <code>server:4443</code>.
+        Dùng <code>tls.Dialer.DialContext()</code> — ở dev mode có <code>InsecureSkipVerify</code>,
+        production dùng cert hợp lệ từ Let's Encrypt.
+        <br/><em>File: <code>internal/client/client.go:35</code></em>
+      </li>
+      <li>
+        <strong>Gửi AuthMsg</strong> với token. Wire format:
+        <code>[len:4B][ver:1B=0x01][type:1B=0x01][json:{token}]</code>.
+        Token rỗng nếu anonymous.
+      </li>
+      <li>
+        <strong>Server validate token</strong> — ba loại:
+        <ul>
+          <li><code>htk_*</code> → KeyStore lookup (JSON file persist trên disk)</li>
+          <li><code>anon:{ip}</code> → anonymous mode, giới hạn nghiêm ngặt</li>
+          <li>Legacy tokens trong config YAML (đang phase out)</li>
+        </ul>
+      </li>
+      <li>
+        <strong>AuthResponse</strong> — success hoặc fail với message. Nếu fail, server đóng
+        connection ngay.
+      </li>
+      <li>
+        <strong>Upgrade sang yamux.Session</strong> — cùng một TCP conn được wrap bởi yamux
+        library. Từ đây, cả hai bên có thể open/accept streams độc lập.
+      </li>
+      <li>
+        <strong>Mở control stream</strong> — stream đầu tiên trong session, dùng riêng cho
+        TunnelReq, TunnelResp, Heartbeat. Các data stream sau này là riêng biệt.
+      </li>
+    </ol>
+
+    <div class="callout info">
+      <span class="callout-icon" aria-hidden="true">💡</span>
+      <div class="callout-body">
+        <strong>Tại sao yamux thay vì mở TCP mới?</strong>
+        <p>
+          Mỗi TLS handshake tốn 1–2 RTT (~20–40ms). Nếu mỗi HTTP request phải tạo lại TCP + TLS,
+          overhead sẽ là 40–80ms per request — không chấp nhận được. Yamux giải quyết bằng cách
+          multiplexing nhiều logical streams trên cùng một TLS connection đã sẵn có.
+        </p>
+      </div>
+    </div>
+
+    <!-- ─── 4. WIRE PROTOCOL ─────────────────────────── -->
+    <h2 id="wire-protocol"><span class="h2-num">04</span> Tầng 2: Wire Protocol</h2>
+
+    <p>
+      Control plane dùng một binary framing protocol đơn giản — length-prefixed frames với
+      JSON payload. Không dùng protobuf hay msgpack để giữ code đơn giản.
+    </p>
+
+<pre class="diagram" role="img" aria-label="Wire protocol frame format">
+┌──────────────┬──────────────┬──────────────┬──────────────────────┐
+│ <span class="d-accent">Length (4B)</span>  │ <span class="d-green">Version (1B)</span> │  <span class="d-yellow">Type (1B)</span>   │   <span class="d-text">JSON Payload</span>       │
+│  Big-Endian  │    0x01      │  0x01–0x10   │     N bytes          │
+└──────────────┴──────────────┴──────────────┴──────────────────────┘
+
+Length = version(1) + type(1) + payload(N)  — không bao gồm 4 byte length field
+Max message size = 1 MB  — hard cap tránh memory exhaustion</pre>
+
+    <p>
+      Encoder dùng mutex để thread-safe khi nhiều goroutine ghi đồng thời vào cùng một
+      control stream. Decoder đọc đúng <code>length</code> byte rồi JSON-unmarshal vào
+      struct tương ứng theo <code>type</code>.
+    </p>
+
+    <h3>Bảng message types</h3>
+
+    <div class="table-wrap">
+      <table aria-label="Wire protocol message types">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Hex</th>
+            <th>Payload</th>
+            <th>Hướng</th>
+            <th>Mô tả</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-type">MsgAuth</td>
+            <td class="td-hex">0x01</td>
+            <td><code>{token}</code></td>
+            <td class="td-dir">C→S</td>
+            <td>Xác thực client</td>
+          </tr>
+          <tr>
+            <td class="td-type">MsgAuthResponse</td>
+            <td class="td-hex">0x02</td>
+            <td><code>{success, message}</code></td>
+            <td class="td-dir">S→C</td>
+            <td>Kết quả xác thực</td>
+          </tr>
+          <tr>
+            <td class="td-type">MsgTunnelReq</td>
+            <td class="td-hex">0x03</td>
+            <td><code>{type, subdomain?, local_port}</code></td>
+            <td class="td-dir">C→S</td>
+            <td>Yêu cầu tạo tunnel</td>
+          </tr>
+          <tr>
+            <td class="td-type">MsgTunnelResp</td>
+            <td class="td-hex">0x04</td>
+            <td><code>{success, url, remote_port?}</code></td>
+            <td class="td-dir">S→C</td>
+            <td>URL tunnel được cấp</td>
+          </tr>
+          <tr>
+            <td class="td-type">MsgHeartbeat</td>
+            <td class="td-hex">0x05</td>
+            <td><code>null</code></td>
+            <td class="td-dir">C→S</td>
+            <td>Keepalive ping</td>
+          </tr>
+          <tr>
+            <td class="td-type">MsgHeartbeatAck</td>
+            <td class="td-hex">0x06</td>
+            <td><code>null</code></td>
+            <td class="td-dir">S→C</td>
+            <td>Keepalive pong</td>
+          </tr>
+          <tr>
+            <td class="td-type">MsgRequestLog</td>
+            <td class="td-hex">0x10</td>
+            <td><code>{method, path, status, duration, size}</code></td>
+            <td class="td-dir">S→C</td>
+            <td>Request log cho dashboard</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout tip">
+      <span class="callout-icon" aria-hidden="true">⚖️</span>
+      <div class="callout-body">
+        <strong>JSON vs protobuf?</strong>
+        <p>
+          Protobuf nhanh hơn 2–3× và nhỏ hơn ~40%. Nhưng cần schema compilation, code generation,
+          và toolchain phức tạp hơn. Với control plane — ít message, không nằm trên critical path
+          của data — JSON đơn giản hơn và debuggable hơn. Trade-off đúng chỗ.
+        </p>
+      </div>
+    </div>
+
+    <!-- ─── 5. YAMUX ──────────────────────────────────── -->
+    <h2 id="yamux"><span class="h2-num">05</span> Tầng 3: Yamux Multiplexing</h2>
+
+    <p>
+      Yamux (Yet Another Multiplexer) của HashiCorp là thư viện multiplexing TCP streams.
+      Concept: một TCP/TLS connection được chia thành N logical streams độc lập, mỗi stream
+      có flow control riêng, cả hai phía đều có thể chủ động open hoặc accept streams.
+    </p>
+
+    <p>
+      Điểm khác biệt với HTTP/2: yamux không có semantic HTTP — chỉ là raw byte streams.
+      Đây là ưu điểm khi dùng để proxy arbitrary protocols (TCP, WebSocket, gRPC raw).
+    </p>
+
+    <h3>Server side</h3>
+
+    <div class="code-block">
+      <pre><span class="cm">// Sau khi auth thành công, wrap conn bằng yamux.Server</span>
+<span class="kw">session</span>, _ := yamux.Server(conn, yamuxCfg)
+
+<span class="cm">// Client luôn mở control stream đầu tiên</span>
+<span class="kw">controlStream</span>, _ := session.AcceptStream()
+
+<span class="cm">// Các stream sau này do server chủ động mở khi có HTTP request đến</span>
+<span class="cm">// session.Open() → gửi yêu cầu open stream đến client</span></pre>
+    </div>
+
+    <h3>Client side</h3>
+
+    <div class="code-block">
+      <pre><span class="cm">// Client wrap conn bằng yamux.Client</span>
+<span class="kw">session</span>, _ := yamux.Client(conn, yamuxCfg)
+
+<span class="cm">// Client chủ động mở control stream đầu tiên</span>
+<span class="kw">controlStream</span>, _ := session.Open()
+
+<span class="cm">// Client accept các data streams mà server mở về sau</span>
+<span class="kw">go</span> <span class="kw">func</span>() {
+    <span class="kw">for</span> {
+        stream, _ := session.AcceptStream()
+        <span class="kw">go</span> handleDataStream(stream)
+    }
+}()</pre>
+    </div>
+
+    <h3>Config</h3>
+    <ul>
+      <li>KeepAlive interval: <strong>30s</strong> — yamux-level keepalive, độc lập với application heartbeat</li>
+      <li>Connection write timeout: <strong>10s</strong> — tránh goroutine bị block vĩnh viễn khi client chậm</li>
+      <li>Session idle timeout: <strong>90s</strong> — nếu không có heartbeat từ application layer, đóng session</li>
+    </ul>
+
+    <div class="callout info">
+      <span class="callout-icon" aria-hidden="true">📌</span>
+      <div class="callout-body">
+        <strong>Hai tầng keepalive</strong>
+        <p>
+          Yamux có keepalive riêng ở transport level. htn-tunnel thêm một lớp application
+          heartbeat (MsgHeartbeat mỗi 30s) để detect dead sessions nhanh hơn và gửi log
+          qua control stream. Hai tầng độc lập nhau.
+        </p>
+      </div>
+    </div>
+
+    <!-- ─── 6. HTTP PROXY ─────────────────────────────── -->
+    <h2 id="http-proxy"><span class="h2-num">06</span> Tầng 4: HTTP Proxy — Reverse proxy</h2>
+
+    <p>
+      Khi browser gửi HTTPS request đến <code>myapp.tunnel.example.com</code>, server phải
+      nhận, decrypt, parse subdomain, tìm đúng client, forward request, nhận response, rồi
+      trả về. Năm bước rõ ràng.
+    </p>
+
+    <h3>Bước 1: TLS termination + SNI extraction</h3>
+    <p>
+      Trước khi decrypt, server đọc SNI (Server Name Indication) từ TLS ClientHello — đây là
+      phần plaintext trong TLS handshake, chứa hostname mà client muốn kết nối.
+    </p>
+    <div class="code-block">
+      <pre>tlsConn.Handshake()
+subdomain := tlsConn.ConnectionState().ServerName
+<span class="cm">// "myapp.tunnel.example.com" → extract "myapp"</span>
+parts := strings.SplitN(serverName, <span class="str">"."</span>, 2)
+subdomain = parts[0]</pre>
+    </div>
+
+    <h3>Bước 2: Tunnel lookup</h3>
+    <div class="code-block">
+      <pre><span class="cm">// O(1) map lookup — sync.RWMutex protected</span>
+ts := tunnelManager.LookupHTTP(subdomain)
+<span class="kw">if</span> ts == <span class="kw">nil</span> {
+    http.Error(w, <span class="str">"502 Tunnel not found"</span>, 502)
+    <span class="kw">return</span>
+}</pre>
+    </div>
+
+    <h3>Bước 3: Reverse proxy với yamuxTransport</h3>
+    <p>
+      Thay vì dùng <code>httputil.ReverseProxy</code> với default transport,
+      htn-tunnel implement custom <code>http.RoundTripper</code> — <code>yamuxTransport</code>.
+    </p>
+    <div class="code-block">
+      <pre><span class="kw">func</span> (t *<span class="ty">yamuxTransport</span>) RoundTrip(req *http.Request) (*http.Response, error) {
+    <span class="cm">// Mỗi HTTP request → mở 1 yamux stream mới</span>
+    stream, err := t.session.Open()
+
+    <span class="cm">// Ghi toàn bộ HTTP request vào stream</span>
+    req.Write(stream)
+
+    <span class="cm">// Đọc HTTP response từ stream</span>
+    resp, err := http.ReadResponse(bufio.NewReader(stream), req)
+    <span class="kw">return</span> resp, err
+}</pre>
+    </div>
+
+    <h3>Bước 4: Forwarding headers</h3>
+    <div class="code-block">
+      <pre><span class="cm">// Set forwarding headers</span>
+req.Header.Set(<span class="str">"X-Forwarded-For"</span>, clientIP)
+req.Header.Set(<span class="str">"X-Forwarded-Proto"</span>, <span class="str">"https"</span>)
+req.Header.Set(<span class="str">"X-Forwarded-Host"</span>, req.Host)
+
+<span class="cm">// Xóa hop-by-hop headers (Connection, Keep-Alive, Upgrade...)</span>
+<span class="cm">// để không confuse app local</span>
+removeHopByHop(req.Header)</pre>
+    </div>
+
+    <h3>Bước 5: Request logging</h3>
+    <p>
+      Response writer được wrap bởi <code>responseRecorder</code> — capture HTTP status code
+      và bytes written. Sau khi response hoàn tất, log entry được gửi qua control stream
+      (MsgRequestLog) về client dashboard, đồng thời được lưu vào ring buffer server-side
+      cho admin dashboard.
+    </p>
+
+    <!-- ─── 7. TCP PROXY ──────────────────────────────── -->
+    <h2 id="tcp-proxy"><span class="h2-num">07</span> Tầng 5: TCP Proxy — Forward port</h2>
+
+    <p>
+      TCP proxy đơn giản hơn HTTP nhiều vì không cần parse — chỉ cần pipe bytes.
+      Dùng cho database (<code>5432</code>), SSH (<code>22</code>), hoặc bất kỳ TCP service nào.
+    </p>
+
+    <ol>
+      <li>
+        <code>tunnelManager.RegisterTCP(session)</code> — allocate random port trong range
+        <code>[portMin, portMax]</code> (config được). Retry 100 lần nếu collision.
+      </li>
+      <li>
+        <code>net.Listen("tcp", ":PORT")</code> — bind port trên server.
+      </li>
+      <li>
+        Goroutine accept connections vô hạn — mỗi incoming conn tạo một yamux stream mới.
+      </li>
+      <li>
+        Bidirectional copy — raw bytes, không parse gì thêm:
+      </li>
+    </ol>
+
+    <div class="code-block">
+      <pre><span class="kw">func</span> proxyTCP(clientConn net.Conn, session *yamux.Session) {
+    stream, _ := session.Open()
+    <span class="kw">defer</span> stream.Close()
+    <span class="kw">defer</span> clientConn.Close()
+
+    done := <span class="kw">make</span>(<span class="kw">chan</span> <span class="kw">struct</span>{}, 2)
+    <span class="kw">go</span> <span class="kw">func</span>() { io.Copy(stream, clientConn); done <- <span class="kw">struct</span>{}{} }()
+    <span class="kw">go</span> <span class="kw">func</span>() { io.Copy(clientConn, stream); done <- <span class="kw">struct</span>{}{} }()
+    <-done <span class="cm">// một chiều đóng → đóng cả hai</span>
+}</pre>
+    </div>
+
+    <!-- ─── 8. WEBSOCKET ──────────────────────────────── -->
+    <h2 id="websocket"><span class="h2-num">08</span> Tầng 6: WebSocket — Xử lý đặc biệt</h2>
+
+    <p>
+      WebSocket là phần tricky nhất của toàn bộ codebase. Vấn đề: WebSocket bắt đầu như
+      HTTP request, sau khi server trả <code>101 Switching Protocols</code>, connection
+      chuyển thành raw bidirectional bytes — hoàn toàn không còn là HTTP.
+      <code>httputil.ReverseProxy</code> không handle được upgrade này đúng cách.
+    </p>
+
+    <h3>Flow xử lý WebSocket</h3>
+
+    <ol>
+      <li><strong>Detect</strong> header <code>Upgrade: websocket</code> + <code>Connection: upgrade</code></li>
+      <li><strong>Hijack HTTP connection</strong> — <code>http.Hijacker</code> lấy raw TCP conn từ Go HTTP server</li>
+      <li><strong>Open yamux stream</strong> mới từ session của client tương ứng</li>
+      <li>
+        <strong>Rewrite Origin header</strong> — dev servers (Vite, webpack-dev-server) thường
+        check <code>Origin</code> và reject nếu không match. Server rewrite về
+        <code>http://localhost:PORT</code>
+      </li>
+      <li><strong>Write HTTP upgrade request</strong> vào stream — kể cả headers đã rewrite</li>
+      <li><strong>Read upgrade response</strong> (101) từ stream</li>
+      <li>
+        <strong>Flush buffered bytes</strong> — đây là bẫy tinh vi nhất (xem callout bên dưới)
+      </li>
+      <li><strong>Bidirectional raw proxy</strong> — từ đây là thuần bytes</li>
+    </ol>
+
+    <div class="code-block">
+      <pre><span class="cm">// Sau khi đọc 101 response</span>
+br := bufio.NewReader(stream)
+resp, _ := http.ReadResponse(br, upgradeReq)
+resp.Write(clientConn)
+
+<span class="cm">// CRITICAL: bufio.Reader có thể đã đọc thêm bytes vào buffer</span>
+<span class="cm">// vượt ngoài HTTP headers — phải flush về client trước</span>
+<span class="kw">if</span> n := br.Buffered(); n > 0 {
+    buf := <span class="kw">make</span>([]<span class="ty">byte</span>, n)
+    io.ReadFull(br, buf)
+    clientConn.Write(buf)
+}
+
+<span class="cm">// Bây giờ mới raw proxy</span>
+<span class="kw">go</span> io.Copy(stream, clientConn)
+io.Copy(clientConn, stream)</pre>
+    </div>
+
+    <div class="callout warning">
+      <span class="callout-icon" aria-hidden="true">⚠️</span>
+      <div class="callout-body">
+        <strong>bufio.Reader trap — bug v0.4.5, fixed v0.4.6</strong>
+        <p>
+          <code>bufio.NewReader</code> đọc từ stream vào internal buffer theo chunk (thường 4KB).
+          Khi parse HTTP response xong, buffer có thể chứa một phần WebSocket frame đầu tiên.
+          Nếu không flush buffer này về client trước khi raw proxy, frame đó bị mất — WebSocket
+          kết nối nhưng app nhận thiếu data. Bug này chỉ xảy ra khi app gửi WebSocket message
+          ngay sau handshake, trước khi server kịp chuyển sang raw mode.
+        </p>
+      </div>
+    </div>
+
+    <!-- ─── 9. TLS WILDCARD ───────────────────────────── -->
+    <h2 id="tls-wildcard"><span class="h2-num">09</span> Tầng 7: TLS Wildcard Cert</h2>
+
+    <p>
+      Tunnel cần cert cho <code>*.tunnel.example.com</code>. HTTP-01 challenge của Let's Encrypt
+      không support wildcard — chỉ cert cho một domain cụ thể. Giải pháp bắt buộc là
+      <strong>DNS-01 challenge</strong>.
+    </p>
+
+    <h3>Flow DNS-01</h3>
+
+    <ol>
+      <li>Server gửi Certificate Signing Request (CSR) lên Let's Encrypt</li>
+      <li>Let's Encrypt yêu cầu: tạo TXT record <code>_acme-challenge.tunnel.example.com</code></li>
+      <li>Server dùng <strong>Cloudflare API</strong> tự động tạo DNS TXT record</li>
+      <li>Let's Encrypt verify TXT record tồn tại và đúng value</li>
+      <li>Let's Encrypt cấp cert — server nhận và lưu trữ</li>
+      <li>Server dùng Cloudflare API xóa TXT record (cleanup)</li>
+    </ol>
+
+    <p>
+      htn-tunnel dùng thư viện <strong>certmagic</strong> của Caddy — tự handle toàn bộ
+      lifecycle: request, store, renew (30 ngày trước expiry), rotate. Server không bao giờ
+      cần restart để renew cert.
+    </p>
+
+    <div class="callout info">
+      <span class="callout-icon" aria-hidden="true">🌐</span>
+      <div class="callout-body">
+        <strong>Tại sao chỉ Cloudflare?</strong>
+        <p>
+          certmagic hỗ trợ nhiều DNS providers (Route53, DigitalOcean, GCP, etc.) nhưng mỗi
+          provider cần code integration riêng. htn-tunnel chỉ implement Cloudflare để giữ
+          codebase tối giản — phù hợp với 80% self-hosters. PR welcome cho providers khác.
+        </p>
+      </div>
+    </div>
+
+    <!-- ─── 10. AUTH & RATE LIMIT ────────────────────── -->
+    <h2 id="auth-rate-limit"><span class="h2-num">10</span> Tầng 8: Auth &amp; Rate Limit</h2>
+
+    <p>
+      Ba tầng defense-in-depth — mỗi tầng chặn một loại abuse khác nhau.
+    </p>
+
+    <h3>Tầng 1: Pre-auth IP rate limit</h3>
+    <p>
+      10 connection attempts / phút / IP. Chặn trước khi đọc bất kỳ byte nào từ client.
+      Dùng sliding window counter trong memory — không cần database.
+    </p>
+
+    <h3>Tầng 2: Auth handshake</h3>
+    <p>Ba loại token, mỗi loại có permission khác nhau:</p>
+
+    <div class="code-block">
+      <pre><span class="cm">// KeyStore format — JSON file trên disk</span>
+{
+  <span class="str">"keys"</span>: {
+    <span class="str">"htk_abc123..."</span>: {
+      <span class="str">"name"</span>:        <span class="str">"John Doe"</span>,
+      <span class="str">"subdomains"</span>:  [<span class="str">"myapp"</span>, <span class="str">"api"</span>],
+      <span class="str">"max_tunnels"</span>: <span class="nu">10</span>,
+      <span class="str">"active"</span>:      <span class="kw">true</span>,
+      <span class="str">"created_at"</span>:  <span class="str">"2026-04-23T00:00:00Z"</span>
+    }
+  }
+}</pre>
+    </div>
+
+    <p>
+      Validation là <strong>O(1)</strong> map lookup — <code>keys[token].Active</code>.
+      File được reload khi có thay đổi (inotify / polling), không cần restart server.
+    </p>
+
+    <h3>Tầng 3: Anonymous mode restrictions</h3>
+
+    <div class="table-wrap">
+      <table aria-label="Anonymous mode restrictions">
+        <thead>
+          <tr><th>Quyền</th><th>Authenticated</th><th>Anonymous</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-label">HTTP tunnel</td>
+            <td class="td-dir">Có</td>
+            <td class="td-dir">Có (random subdomain)</td>
+          </tr>
+          <tr>
+            <td class="td-label">Custom subdomain</td>
+            <td class="td-dir">Có</td>
+            <td style="color:#ff6b6b">Không</td>
+          </tr>
+          <tr>
+            <td class="td-label">TCP tunnel</td>
+            <td class="td-dir">Có</td>
+            <td style="color:#ff6b6b">Không</td>
+          </tr>
+          <tr>
+            <td class="td-label">Số tunnel đồng thời</td>
+            <td class="td-dir">Theo config</td>
+            <td>1 per IP</td>
+          </tr>
+          <tr>
+            <td class="td-label">Thời gian tồn tại</td>
+            <td class="td-dir">Vĩnh viễn (khi online)</td>
+            <td>2 giờ</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ─── 11. DASHBOARD ─────────────────────────────── -->
+    <h2 id="dashboard"><span class="h2-num">11</span> Tầng 9: Dashboard &amp; Analytics</h2>
+
+    <p>
+      Dashboard cần hai loại data: <strong>real-time stream</strong> (request log tức thì)
+      và <strong>historical aggregates</strong> (traffic chart 30 phút). Giải pháp:
+      SSE + in-memory ring buffer, không cần database.
+    </p>
+
+    <h3>SSE (Server-Sent Events) cho real-time</h3>
+
+    <div class="code-block">
+      <pre><span class="cm">// Headers quan trọng để SSE hoạt động qua nginx</span>
+w.Header().Set(<span class="str">"Content-Type"</span>, <span class="str">"text/event-stream"</span>)
+w.Header().Set(<span class="str">"Cache-Control"</span>, <span class="str">"no-cache"</span>)
+w.Header().Set(<span class="str">"X-Accel-Buffering"</span>, <span class="str">"no"</span>) <span class="cm">// chặn nginx buffer SSE</span>
+w.Header().Set(<span class="str">"Connection"</span>, <span class="str">"keep-alive"</span>)</pre>
+    </div>
+
+    <p>
+      Mỗi dashboard subscriber đăng ký vào pub/sub channel. Khi có request mới, server
+      broadcast log entry đến tất cả subscribers. Subscriber chậm sẽ bị skip (non-blocking
+      channel send) — không bao giờ làm nghẽn server.
+    </p>
+
+    <h3>Ring buffer — 10.000 entries</h3>
+    <p>
+      In-memory, thread-safe với <code>sync.RWMutex</code>. Circular buffer — khi đầy,
+      entry cũ nhất bị overwrite. Query: recent N entries, traffic per minute, top paths,
+      status code breakdown. Đủ cho 99% monitoring use case mà không cần setup Prometheus
+      hay InfluxDB.
+    </p>
+
+    <h3>Per-minute aggregates</h3>
+    <p>
+      Goroutine background chạy mỗi phút — đọc entries từ ring buffer, aggregate thành
+      bucket theo timestamp. Dashboard fetch 30 bucket gần nhất để vẽ bar chart.
+      Memory footprint cố định, không tăng theo traffic.
+    </p>
+
+    <!-- ─── 12. FULL REQUEST FLOW ─────────────────────── -->
+    <h2 id="request-flow"><span class="h2-num">12</span> Full Request Flow</h2>
+
+    <p>
+      Theo chân một HTTP request từ lúc browser gửi đến lúc app local nhận — tổng hợp
+      tất cả các tầng đã phân tích.
+    </p>
+
+<pre class="diagram" role="img" aria-label="Sequence diagram: browser request đến localhost">
+<span class="d-text">Browser</span>                <span class="d-text">Server</span>                   <span class="d-accent">Client</span>                <span class="d-green">App</span>
+  │                      │                        │                     │
+  │── <span class="d-green">HTTPS (TLS+SNI)</span> ──▶│                        │                     │
+  │                      │ TLS handshake (~20ms)  │                     │
+  │                      │ SNI → subdomain lookup │                     │
+  │                      │                        │                     │
+  │                      │── <span class="d-accent">yamux.Open()</span> ────────▶│                     │
+  │                      │                        │                     │
+  │                      │── <span class="d-text">HTTP request ──────</span>──▶│                     │
+  │                      │                        │── <span class="d-green">Dial localhost</span> ───▶│
+  │                      │                        │    (TCP ~2ms)       │
+  │                      │                        │── <span class="d-text">HTTP request</span> ─────▶│
+  │                      │                        │                     │─ handler (~Xms)
+  │                      │                        │◀── <span class="d-text">HTTP response</span> ────│
+  │                      │◀── <span class="d-text">HTTP response</span> ──────│                     │
+  │◀── <span class="d-green">encrypted response</span>──│                        │                     │
+</pre>
+
+    <h3>Latency breakdown</h3>
+
+    <div class="table-wrap">
+      <table aria-label="Latency breakdown per step">
+        <thead>
+          <tr><th>Bước</th><th>Latency ước tính</th><th>Ghi chú</th></tr>
+        </thead>
+        <tbody class="latency-row">
+          <tr>
+            <td class="td-label">TLS handshake (browser → server)</td>
+            <td>~20ms</td>
+            <td>TLS 1.3 = 1-RTT</td>
+          </tr>
+          <tr>
+            <td class="td-label">SNI lookup + tunnel registry</td>
+            <td>&lt;1ms</td>
+            <td>O(1) map</td>
+          </tr>
+          <tr>
+            <td class="td-label">yamux.Open() → client accept</td>
+            <td>~RTT/2</td>
+            <td>Phụ thuộc latency server↔client</td>
+          </tr>
+          <tr>
+            <td class="td-label">HTTP request transit → client</td>
+            <td>~RTT/2</td>
+            <td>Cùng TCP connection, không thêm handshake</td>
+          </tr>
+          <tr>
+            <td class="td-label">Client dial localhost</td>
+            <td>~2ms</td>
+            <td>Loopback, rất nhanh</td>
+          </tr>
+          <tr>
+            <td class="td-label">App xử lý</td>
+            <td>X ms</td>
+            <td>Phụ thuộc app</td>
+          </tr>
+          <tr>
+            <td class="td-label">Response transit ngược</td>
+            <td>~RTT</td>
+            <td>Cùng yamux stream</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      <strong>Tổng overhead so với local-only:</strong> ~2×RTT (server↔client) + 20ms TLS
+      + ~5ms misc. Với server và client cùng datacenter region, RTT ~5–10ms → overhead
+      tổng ~30–40ms. Hoàn toàn chấp nhận được cho dev workflow.
+    </p>
+
+    <div class="callout info">
+      <span class="callout-icon" aria-hidden="true">🔁</span>
+      <div class="callout-body">
+        <strong>WebSocket khác gì?</strong>
+        <p>
+          WebSocket chỉ có overhead một lần ở handshake phase (tương tự trên). Sau đó là
+          bidirectional raw stream — latency per message chỉ là RTT server↔client, không
+          có HTTP overhead. Thường nhanh hơn HTTP/request cho real-time use cases.
+        </p>
+      </div>
+    </div>
+
+    <!-- ─── 13. KEY TAKEAWAYS ─────────────────────────── -->
+    <h2 id="takeaways"><span class="h2-num">13</span> Key Takeaways &amp; Gợi ý implementation</h2>
+
+    <p>
+      Nếu bạn muốn tự build tunneling tool tương tự, đây là những bài học quan trọng nhất:
+    </p>
+
+    <h3>Kiến trúc</h3>
+
+    <ol>
+      <li>
+        <strong>Dùng yamux hoặc HTTP/2 — đừng tự viết multiplexing.</strong>
+        Multiplexing đúng cách (flow control, window size, backpressure) rất phức tạp.
+        yamux của HashiCorp đã battle-tested trong Consul, Vault, Nomad.
+      </li>
+      <li>
+        <strong>Tách biệt control plane và data plane.</strong>
+        Control stream (JSON messages) và data streams (raw bytes) trên cùng yamux session
+        nhưng hoàn toàn độc lập. Control không bao giờ bị nghẽn vì data và ngược lại.
+      </li>
+      <li>
+        <strong>Client-initiated luôn luôn.</strong>
+        Server không bao giờ dial client — client dial server. Đây là yêu cầu bắt buộc
+        để vượt qua NAT. Kiến trúc phải phản ánh điều này từ đầu.
+      </li>
+    </ol>
+
+    <h3>Implementation gotchas</h3>
+
+    <ol>
+      <li>
+        <strong>DNS-01 challenge là bắt buộc cho wildcard cert.</strong>
+        HTTP-01 không support <code>*.domain.com</code>. Setup Cloudflare API key ngay
+        từ đầu, đừng để sau.
+      </li>
+      <li>
+        <strong>Test WebSocket kỹ — bufio trap là thật.</strong>
+        Mọi HTTP parsing library đều dùng buffered reader. Khi switch sang raw mode,
+        phải flush buffer còn lại trước. Thiếu bước này: frame loss, bug khó reproduce.
+      </li>
+      <li>
+        <strong>Ring buffer thay database cho analytics.</strong>
+        Đơn giản hơn 10×, không cần infra, đủ cho 99% use case. Chỉ upgrade khi có
+        requirement retention > vài giờ hoặc multi-server.
+      </li>
+      <li>
+        <strong>SSE cần <code>X-Accel-Buffering: no</code> khi đứng sau nginx.</strong>
+        Nginx mặc định buffer response — SSE events sẽ không realtime nếu thiếu header này.
+      </li>
+    </ol>
+
+    <h3>Tech stack tối giản</h3>
+
+    <div class="table-wrap">
+      <table aria-label="Tech stack recommendations">
+        <thead>
+          <tr><th>Thành phần</th><th>Lựa chọn</th><th>Lý do</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-label">Runtime</td>
+            <td><strong>Go</strong></td>
+            <td>Goroutines phù hợp tự nhiên với pattern per-stream-per-goroutine. Static binary dễ deploy.</td>
+          </tr>
+          <tr>
+            <td class="td-label">Multiplexing</td>
+            <td><strong>yamux</strong></td>
+            <td>Đơn giản, battle-tested, raw streams không tied với HTTP semantic</td>
+          </tr>
+          <tr>
+            <td class="td-label">TLS cert</td>
+            <td><strong>certmagic</strong></td>
+            <td>Auto-renew, DNS-01 support, zero config</td>
+          </tr>
+          <tr>
+            <td class="td-label">CLI</td>
+            <td><strong>cobra</strong></td>
+            <td>Standard Go CLI framework, subcommand support</td>
+          </tr>
+          <tr>
+            <td class="td-label">Frontend</td>
+            <td><strong>Vanilla JS + CSS</strong></td>
+            <td>Dashboard không cần React — giảm bundle size, không cần build step</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Tổng codebase htn-tunnel: <strong>~1500 dòng logic core</strong> (không tính CLI boilerplate,
+      config parsing, tests). Đủ để đọc hết trong một buổi chiều.
+    </p>
+
+    <div class="callout tip">
+      <span class="callout-icon" aria-hidden="true">🚀</span>
+      <div class="callout-body">
+        <strong>Fork và build phiên bản của bạn</strong>
+        <p>
+          htn-tunnel là open source (MIT). Code tại
+          <a href="https://github.com/nhh0718/htn-tunnel" target="_blank" rel="noopener noreferrer">
+            github.com/nhh0718/htn-tunnel
+          </a>.
+          Architecture đã được giữ đủ đơn giản để có thể fork, đọc hiểu, và customize
+          cho use case riêng. PR welcome.
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer links -->
+    <nav class="article-footer" aria-label="Article navigation">
+      <div class="article-footer-links">
+        <a href="../">← Trang chủ</a>
+        <a href="../docs/">Tài liệu hướng dẫn</a>
+        <a href="https://github.com/nhh0718/htn-tunnel" target="_blank" rel="noopener noreferrer">GitHub →</a>
+      </div>
+    </nav>
+
+  </article><!-- /article-content -->
+
+  <!-- ═══════════════════════════════════════════════════
+       FLOATING TOC (desktop)
+  ════════════════════════════════════════════════════ -->
+  <nav class="article-toc" aria-label="Mục lục bài viết">
+    <div class="toc-title">Trên trang này</div>
+    <ul class="toc-list">
+      <li><a href="#tong-quan">1. Tổng quan</a></li>
+      <li><a href="#kien-truc-tong-the">2. Kiến trúc tổng thể</a></li>
+      <li><a href="#control-plane">3. Control Plane</a></li>
+      <li><a href="#wire-protocol">4. Wire Protocol</a></li>
+      <li><a href="#yamux">5. Yamux Multiplexing</a></li>
+      <li><a href="#http-proxy">6. HTTP Proxy</a></li>
+      <li><a href="#tcp-proxy">7. TCP Proxy</a></li>
+      <li><a href="#websocket">8. WebSocket</a></li>
+      <li><a href="#tls-wildcard">9. TLS Wildcard Cert</a></li>
+      <li><a href="#auth-rate-limit">10. Auth &amp; Rate Limit</a></li>
+      <li><a href="#dashboard">11. Dashboard &amp; Analytics</a></li>
+      <li><a href="#request-flow">12. Full Request Flow</a></li>
+      <li><a href="#takeaways">13. Key Takeaways</a></li>
+    </ul>
+  </nav>
+
+</div><!-- /article-layout -->
+</main>
+
+<!-- ═══════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════ -->
+<footer role="contentinfo">
+  <div class="footer-inner">
+    <span class="footer-logo">htn-tunnel</span>
+
+    <ul class="footer-links" role="list">
+      <li><a href="../">Trang chủ</a></li>
+      <li><a href="../docs/">Docs</a></li>
+      <li>
+        <a href="https://github.com/nhh0718/htn-tunnel"
+           target="_blank" rel="noopener noreferrer">GitHub</a>
+      </li>
+      <li>
+        <a href="https://github.com/nhh0718/htn-tunnel/blob/main/LICENSE"
+           target="_blank" rel="noopener noreferrer">MIT License</a>
+      </li>
+    </ul>
+
+    <p class="footer-copy">&copy; 2026 htn-tunnel · MIT License</p>
+  </div>
+</footer>
+
+<script src="article.js"></script>
+</body>
+</html>
