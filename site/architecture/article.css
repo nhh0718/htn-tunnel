@@ -9,7 +9,13 @@
 .article-layout {
   display: grid;
   grid-template-columns: minmax(0, 740px) 220px;
-  grid-template-areas: "content toc";
+  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-areas:
+    "header  toc"
+    "mobtog  toc"
+    "mobbody toc"
+    "content toc"
+    "footer  toc";
   gap: 0 48px;
   max-width: 1040px;
   margin: 0 auto;
@@ -39,10 +45,11 @@
 /* ── Article header ─────────────────────────────────────── */
 
 .article-header {
-  grid-area: content;
+  grid-area: header;
   padding: 56px 0 40px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 48px;
+  min-width: 0;
 }
 
 .article-label {
@@ -383,6 +390,7 @@ pre.diagram .d-yellow { color: #e7d08a; }
 
 .article-toc {
   grid-area: toc;
+  grid-row: 1 / -1;
   position: sticky;
   top: calc(var(--nav-height) + 24px);
   max-height: calc(100vh - var(--nav-height) - 48px);
@@ -435,6 +443,7 @@ pre.diagram .d-yellow { color: #e7d08a; }
 
 /* Mobile TOC toggle */
 .toc-mobile-toggle {
+  grid-area: mobtog;
   display: none;
   width: 100%;
   align-items: center;
@@ -454,12 +463,13 @@ pre.diagram .d-yellow { color: #e7d08a; }
 
 .toc-mobile-toggle:hover { background: rgba(255,255,255,0.05); color: var(--text); }
 
-.toc-mobile-body { display: none; }
+.toc-mobile-body { grid-area: mobbody; display: none; }
 .toc-mobile-body.open { display: block; }
 
 /* ── Article footer ─────────────────────────────────────── */
 
 .article-footer {
+  grid-area: footer;
   margin-top: 72px;
   padding-top: 40px;
   border-top: 1px solid var(--border);
@@ -496,7 +506,13 @@ pre.diagram .d-yellow { color: #e7d08a; }
 @media (max-width: 1024px) {
   .article-layout {
     grid-template-columns: 1fr;
-    grid-template-areas: "content";
+    grid-template-rows: auto auto auto 1fr auto;
+    grid-template-areas:
+      "header"
+      "mobtog"
+      "mobbody"
+      "content"
+      "footer";
     max-width: 740px;
   }
 
