@@ -68,7 +68,7 @@
 
 .flow-canvas {
   background: #0d1520;
-  line-height: 0;  /* remove inline-block gap */
+  line-height: 0;
   position: relative;
 }
 
@@ -88,54 +88,65 @@
   fill: none;
 }
 
-/* Node circles */
+/* Node circles — larger radius (42px set in JS) */
 .node-circle {
   fill: #0f3460;
-  stroke: rgba(255, 255, 255, 0.1);
+  stroke: rgba(255, 255, 255, 0.12);
   stroke-width: 1.5;
-  transition: stroke 0.2s, fill 0.2s;
+  transition: stroke 0.2s;
 }
 
+/* Hover: brighten border only (no transform jump) */
 .node-group:hover .node-circle {
-  fill: #1a4a80;
-  stroke: rgba(0, 122, 255, 0.4);
+  stroke: rgba(255, 255, 255, 0.28);
+  fill: #153a6e;
 }
 
-/* Node icon (emoji) */
-.node-icon {
-  font-size: 18px;
-  dominant-baseline: middle;
-  text-anchor: middle;
-  user-select: none;
+/* SVG icon inside node — inherits color from accent tint set inline */
+.node-icon-svg {
   pointer-events: none;
+  user-select: none;
+  /* currentColor falls back to node text color when no accent inline style */
+  color: #c0cce0;
 }
 
-/* Node label */
+/* Individual stroke properties for all SVG elements inside icon */
+.node-icon-svg line,
+.node-icon-svg polyline,
+.node-icon-svg path,
+.node-icon-svg rect,
+.node-icon-svg polygon {
+  vector-effect: non-scaling-stroke;
+}
+
+/* Node label — larger, slightly bolder */
 .node-label {
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 500;
   fill: #c0cce0;
   text-anchor: middle;
   dominant-baseline: hanging;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-weight: 500;
-  letter-spacing: 0.1px;
+  letter-spacing: 0.3px;
   pointer-events: none;
   user-select: none;
 }
 
-/* Animated packet circles */
+/* Animated packet dot — stronger glow filter applied via JS */
 .packet-dot {
-  /* glow filter applied via JS per-color */
   transition: opacity 0.1s;
+  /* CSS drop-shadow as secondary glow layer */
+  filter: drop-shadow(0 0 12px currentColor);
 }
 
 .packet-label-text {
-  font-size: 9px;
-  fill: rgba(255, 255, 255, 0.85);
+  font-size: 9.5px;
+  fill: rgba(255, 255, 255, 0.9);
   text-anchor: middle;
   dominant-baseline: middle;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-weight: 600;
+  letter-spacing: 0.2px;
   pointer-events: none;
   user-select: none;
 }
@@ -202,14 +213,14 @@
   font-family: var(--mono, monospace);
   font-size: 11px;
   color: var(--accent);
-  min-width: 28px;
+  min-width: 32px;  /* wider to fit "0.75×" */
   text-align: right;
 }
 
 .flow-speed-input {
   -webkit-appearance: none;
   appearance: none;
-  width: 80px;
+  width: 90px;
   height: 3px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.1);
