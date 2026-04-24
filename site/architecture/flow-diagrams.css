@@ -1,0 +1,281 @@
+/* ============================================================
+   htn-tunnel Architecture — Animated Flow Diagrams
+   Styles for interactive SVG packet-animation diagrams.
+   Depends on: ../style.css (design tokens)
+   ============================================================ */
+
+/* ── Container card ─────────────────────────────────────── */
+
+.flow-diagram {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 24px 0 32px;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+
+.flow-diagram-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.flow-diagram-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.2px;
+  margin-bottom: 4px;
+}
+
+.flow-diagram-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Legend ─────────────────────────────────────────────── */
+
+.flow-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.flow-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.flow-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── SVG canvas wrapper ─────────────────────────────────── */
+
+.flow-canvas {
+  background: #0d1520;
+  line-height: 0;  /* remove inline-block gap */
+  position: relative;
+}
+
+.flow-canvas svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ── SVG internals ──────────────────────────────────────── */
+
+/* Edges — static dashed gray arrows */
+.flow-edge {
+  stroke: rgba(136, 146, 176, 0.35);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  fill: none;
+}
+
+/* Node circles */
+.node-circle {
+  fill: #0f3460;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1.5;
+  transition: stroke 0.2s, fill 0.2s;
+}
+
+.node-group:hover .node-circle {
+  fill: #1a4a80;
+  stroke: rgba(0, 122, 255, 0.4);
+}
+
+/* Node icon (emoji) */
+.node-icon {
+  font-size: 18px;
+  dominant-baseline: middle;
+  text-anchor: middle;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Node label */
+.node-label {
+  font-size: 11px;
+  fill: #c0cce0;
+  text-anchor: middle;
+  dominant-baseline: hanging;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Animated packet circles */
+.packet-dot {
+  /* glow filter applied via JS per-color */
+  transition: opacity 0.1s;
+}
+
+.packet-label-text {
+  font-size: 9px;
+  fill: rgba(255, 255, 255, 0.85);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Controls ────────────────────────────────────────────── */
+
+.flow-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
+}
+
+.flow-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font, inherit);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.flow-btn:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.flow-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.flow-btn.active {
+  background: rgba(0, 122, 255, 0.15);
+  border-color: rgba(0, 122, 255, 0.4);
+  color: #6fb3ff;
+}
+
+/* Speed control */
+.flow-speed-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flow-speed-value {
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  color: var(--accent);
+  min-width: 28px;
+  text-align: right;
+}
+
+.flow-speed-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 80px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.flow-speed-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid #0d1520;
+}
+
+.flow-speed-input::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid #0d1520;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .flow-controls {
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .flow-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  .flow-speed-label {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .flow-legend {
+    gap: 10px;
+    padding: 8px 14px;
+  }
+
+  .flow-diagram-header {
+    padding: 12px 14px 10px;
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .packet-dot {
+    display: none;
+  }
+
+  .flow-btn.play-pause::after {
+    content: ' (paused – reduced motion)';
+    font-size: 10px;
+    opacity: 0.6;
+  }
+}

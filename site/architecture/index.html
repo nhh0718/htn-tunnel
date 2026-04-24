@@ -20,6 +20,7 @@
   <link rel="canonical" href="https://nhh0718.github.io/htn-tunnel/architecture/" />
   <link rel="stylesheet" href="../style.css" />
   <link rel="stylesheet" href="article.css" />
+  <link rel="stylesheet" href="flow-diagrams.css" />
 </head>
 <body>
 
@@ -96,6 +97,7 @@
     <ul class="toc-list">
       <li><a href="#van-de">1. Vấn đề cần giải quyết</a></li>
       <li><a href="#tong-the">2. Bức tranh tổng thể</a></li>
+      <li><a href="#luong-hoat-dong">2b. Luồng hoạt động</a></li>
       <li><a href="#ket-noi-nguoc">3. Kết nối ngược</a></li>
       <li><a href="#multiplexing">4. Multiplexing</a></li>
       <li><a href="#bao-mat">5. Bảo mật — TLS &amp; Wildcard cert</a></li>
@@ -201,6 +203,34 @@
         </p>
       </div>
     </div>
+
+    <!-- ─── 2b. LUỒNG HOẠT ĐỘNG ──────────────────────────── -->
+    <h2 id="luong-hoat-dong"><span class="h2-num">02b</span> Luồng hoạt động</h2>
+
+    <p>
+      Bạn đã biết các thành phần. Giờ hãy theo dõi gói tin di chuyển qua hệ thống —
+      mỗi diagram bên dưới cho thấy một luồng cụ thể, với các packet chạy theo thời gian thực.
+    </p>
+
+    <h3>Luồng 1: Toàn cảnh một HTTPS request</h3>
+    <p>Từ lúc browser gõ URL đến khi nhận được response — qua 4 hop.</p>
+    <div class="flow-diagram" data-diagram="tunnel-overview"></div>
+
+    <h3>Luồng 2: Client kết nối server lần đầu</h3>
+    <p>TLS handshake → xác thực token → nâng cấp lên yamux → mở control stream.</p>
+    <div class="flow-diagram" data-diagram="handshake"></div>
+
+    <h3>Luồng 3: HTTP request đi qua yamux</h3>
+    <p>SNI Router phân loại request, yamux mở stream mới, client forward xuống localhost.</p>
+    <div class="flow-diagram" data-diagram="http-request"></div>
+
+    <h3>Luồng 4: Cấp wildcard cert qua DNS-01</h3>
+    <p>Server xin cert <code>*.tunnel.com</code> — Let's Encrypt yêu cầu TXT record, Cloudflare tạo tự động.</p>
+    <div class="flow-diagram" data-diagram="tls-cert"></div>
+
+    <h3>Luồng 5: WebSocket upgrade</h3>
+    <p>HTTP Upgrade → 101 Switching Protocols → raw bytes hai chiều qua toàn bộ tunnel.</p>
+    <div class="flow-diagram" data-diagram="websocket"></div>
 
     <!-- ─── 3. KẾT NỐI NGƯỢC ─────────────────────────────── -->
     <h2 id="ket-noi-nguoc"><span class="h2-num">03</span> Tầng 1: Kết nối ngược (Reverse connection)</h2>
@@ -948,6 +978,7 @@ Server  → Đọc SNI → Biết là alice → Lookup → Forward tới client 
     <ul class="toc-list">
       <li><a href="#van-de">1. Vấn đề cần giải quyết</a></li>
       <li><a href="#tong-the">2. Bức tranh tổng thể</a></li>
+      <li><a href="#luong-hoat-dong">2b. Luồng hoạt động</a></li>
       <li><a href="#ket-noi-nguoc">3. Kết nối ngược</a></li>
       <li><a href="#multiplexing">4. Multiplexing</a></li>
       <li><a href="#bao-mat">5. Bảo mật — TLS &amp; Wildcard cert</a></li>
@@ -989,5 +1020,6 @@ Server  → Đọc SNI → Biết là alice → Lookup → Forward tới client 
 </footer>
 
 <script src="article.js"></script>
+<script src="flow-diagrams.js" defer></script>
 </body>
 </html>
