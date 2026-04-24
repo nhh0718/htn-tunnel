@@ -231,12 +231,12 @@ const DIAGRAMS = {
     /* t values: ~500ms gap after each previous packet finishes (1400ms dur).
        Previous ends at t + 1400; next starts at t + 1400 + 500. */
     packets: [
-      { t: 0,    path: ['browser', 'server'], color: '#007AFF', label: 'HTTPS req' },
-      { t: 1900, path: ['server',  'client'], color: '#007AFF', label: 'yamux fwd' },
-      { t: 3800, path: ['client',  'app'],    color: '#007AFF', label: 'HTTP req'  },
-      { t: 5700, path: ['app',     'client'], color: '#34C759', label: 'Response'  },
-      { t: 7600, path: ['client',  'server'], color: '#34C759' },
-      { t: 9500, path: ['server',  'browser'],color: '#34C759', label: 'HTTPS resp'},
+      { t: 0,    path: ['browser', 'server'], color: '#007AFF', label: 'HTTPS request từ browser' },
+      { t: 1900, path: ['server',  'client'], color: '#007AFF', label: 'Forward qua yamux stream' },
+      { t: 3800, path: ['client',  'app'],    color: '#007AFF', label: 'Dial localhost:3000'       },
+      { t: 5700, path: ['app',     'client'], color: '#34C759', label: 'Response từ app local'     },
+      { t: 7600, path: ['client',  'server'], color: '#34C759', label: 'Stream response ngược'     },
+      { t: 9500, path: ['server',  'browser'],color: '#34C759', label: 'HTTPS response về browser' },
     ],
     /* cycle = last packet end + 1000ms breath: 9500+1400+1000 = 11900 */
     cycleDuration: 11900,
@@ -263,14 +263,14 @@ const DIAGRAMS = {
     ],
     /* gap ~500ms between consecutive packets */
     packets: [
-      { t: 0,    path: ['client', 'server'], color: '#fbbf24', label: 'ClientHello' },
-      { t: 1900, path: ['server', 'client'], color: '#fbbf24', label: 'ServerHello+Cert' },
-      { t: 3800, path: ['client', 'server'], color: '#fbbf24', label: 'TLS Finished' },
-      { t: 5700, path: ['client', 'server'], color: '#007AFF', label: 'Auth token' },
-      { t: 7600, path: ['server', 'client'], color: '#34C759', label: 'AuthOK' },
-      { t: 9500, path: ['client', 'server'], color: '#007AFF', label: 'yamux open' },
-      { t: 11400,path: ['server', 'client'], color: '#007AFF', label: 'yamux ack' },
-      { t: 13300,path: ['client', 'server'], color: '#fbbf24', label: 'ctrl stream' },
+      { t: 0,    path: ['client', 'server'], color: '#fbbf24', label: 'TLS ClientHello (bắt tay)'     },
+      { t: 1900, path: ['server', 'client'], color: '#fbbf24', label: 'TLS ServerHello + Certificate'  },
+      { t: 3800, path: ['client', 'server'], color: '#fbbf24', label: 'TLS Finished — mã hoá sẵn sàng'},
+      { t: 5700, path: ['client', 'server'], color: '#007AFF', label: 'Gửi Auth message (token)'       },
+      { t: 7600, path: ['server', 'client'], color: '#34C759', label: 'AuthResponse: thành công'       },
+      { t: 9500, path: ['client', 'server'], color: '#007AFF', label: 'Nâng cấp sang Yamux'            },
+      { t: 11400,path: ['server', 'client'], color: '#007AFF', label: 'Server cũng nâng cấp Yamux'     },
+      { t: 13300,path: ['client', 'server'], color: '#fbbf24', label: 'Mở control stream'              },
     ],
     /* 13300 + 1400 + 1000 = 15700 */
     cycleDuration: 15700,
@@ -300,13 +300,13 @@ const DIAGRAMS = {
       { color: '#34C759', label: 'Response' },
     ],
     packets: [
-      { t: 0,    path: ['browser', 'sni'],    color: '#007AFF', label: 'HTTPS' },
-      { t: 1900, path: ['sni',    'yamux'],   color: '#007AFF', label: 'open stream' },
-      { t: 3800, path: ['yamux',  'client'],  color: '#007AFF', label: 'stream data' },
-      { t: 5700, path: ['client', 'app'],     color: '#007AFF', label: 'HTTP req' },
-      { t: 7600, path: ['app',    'client'],  color: '#34C759', label: 'HTTP resp' },
-      { t: 9500, path: ['client', 'yamux'],   color: '#34C759' },
-      { t: 11400,path: ['yamux',  'browser'], color: '#34C759', label: 'HTTPS resp' },
+      { t: 0,    path: ['browser', 'sni'],    color: '#007AFF', label: 'HTTPS request đến subdomain'       },
+      { t: 1900, path: ['sni',    'yamux'],   color: '#007AFF', label: 'Tra map subdomain → client'        },
+      { t: 3800, path: ['yamux',  'client'],  color: '#007AFF', label: 'Mở stream mới, gửi HTTP request'   },
+      { t: 5700, path: ['client', 'app'],     color: '#007AFF', label: 'Forward tới localhost'              },
+      { t: 7600, path: ['app',    'client'],  color: '#34C759', label: 'HTTP response'                      },
+      { t: 9500, path: ['client', 'yamux'],   color: '#34C759', label: 'Gửi response qua stream'           },
+      { t: 11400,path: ['yamux',  'browser'], color: '#34C759', label: 'Trả response về browser'            },
     ],
     /* 11400 + 1400 + 1000 = 13800 */
     cycleDuration: 13800,
@@ -336,14 +336,14 @@ const DIAGRAMS = {
       { color: '#34C759', label: 'Success' },
     ],
     packets: [
-      { t: 0,    path: ['server', 'le'],     color: '#007AFF', label: 'xin cert *.tunnel.com' },
-      { t: 2400, path: ['le',     'server'], color: '#fbbf24', label: 'TXT challenge' },
-      { t: 4800, path: ['server', 'cf'],     color: '#007AFF', label: 'add TXT record' },
-      { t: 7200, path: ['cf',     'server'], color: '#34C759', label: 'DNS OK' },
-      { t: 9600, path: ['server', 'le'],     color: '#007AFF', label: 'verify now' },
-      { t: 12000,path: ['le',     'cf'],     color: '#fbbf24', label: 'DNS query' },
-      { t: 14400,path: ['le',     'server'], color: '#34C759', label: 'cert 90d' },
-      { t: 16800,path: ['server', 'cf'],     color: '#007AFF', label: 'delete TXT' },
+      { t: 0,    path: ['server', 'le'],     color: '#007AFF', label: 'Xin cert *.tunnel.com'       },
+      { t: 2400, path: ['le',     'server'], color: '#fbbf24', label: 'Yêu cầu tạo TXT record'      },
+      { t: 4800, path: ['server', 'cf'],     color: '#007AFF', label: 'API: tạo TXT _acme-challenge' },
+      { t: 7200, path: ['cf',     'server'], color: '#34C759', label: 'OK — record đã tạo'           },
+      { t: 9600, path: ['server', 'le'],     color: '#007AFF', label: 'Verify đi'                    },
+      { t: 12000,path: ['le',     'cf'],     color: '#fbbf24', label: 'DNS query record'              },
+      { t: 14400,path: ['le',     'server'], color: '#34C759', label: 'Cấp cert 90 ngày'             },
+      { t: 16800,path: ['server', 'cf'],     color: '#007AFF', label: 'Xoá TXT record'               },
     ],
     /* 16800 + 1400 + 1000 = 19200 */
     cycleDuration: 19200,
@@ -372,17 +372,17 @@ const DIAGRAMS = {
       { color: '#a78bfa', label: 'WS frames' },
     ],
     packets: [
-      { t: 0,    path: ['browser', 'server'], color: '#007AFF', label: 'HTTP Upgrade' },
-      { t: 1900, path: ['server',  'client'], color: '#007AFF', label: 'yamux stream' },
-      { t: 3800, path: ['client',  'app'],    color: '#007AFF', label: 'Upgrade fwd' },
-      { t: 5700, path: ['app',     'client'], color: '#34C759', label: '101 Switching' },
-      { t: 7600, path: ['client',  'server'], color: '#34C759', label: '101 back' },
-      { t: 9500, path: ['server',  'browser'],color: '#34C759', label: '101 OK' },
+      { t: 0,    path: ['browser', 'server'], color: '#007AFF', label: 'HTTP Upgrade: websocket'   },
+      { t: 1900, path: ['server',  'client'], color: '#007AFF', label: 'Forward upgrade request'   },
+      { t: 3800, path: ['client',  'app'],    color: '#007AFF', label: 'Upgrade tới local app'     },
+      { t: 5700, path: ['app',     'client'], color: '#34C759', label: '101 Switching Protocols'   },
+      { t: 7600, path: ['client',  'server'], color: '#34C759', label: '101 về server'             },
+      { t: 9500, path: ['server',  'browser'],color: '#34C759', label: '101 về browser'            },
       /* bidirectional WS frames — shorter duration so they feel snappy */
-      { t: 11400,path: ['browser', 'app'],    color: '#a78bfa', label: 'WS frame' },
-      { t: 12800,path: ['app',     'browser'],color: '#a78bfa', label: 'WS frame' },
-      { t: 14200,path: ['browser', 'app'],    color: '#a78bfa' },
-      { t: 15600,path: ['app',     'browser'],color: '#a78bfa' },
+      { t: 11400,path: ['browser', 'app'],    color: '#a78bfa', label: 'Raw bytes (client → server)' },
+      { t: 12800,path: ['app',     'browser'],color: '#a78bfa', label: 'Raw bytes (server → client)' },
+      { t: 14200,path: ['browser', 'app'],    color: '#a78bfa', label: 'WebSocket message tiếp...'   },
+      { t: 15600,path: ['app',     'browser'],color: '#a78bfa', label: 'WebSocket trả về...'         },
     ],
     /* 15600 + 1400 + 1000 = 18000 */
     cycleDuration: 18000,
@@ -575,28 +575,22 @@ function buildDiagram(container, id, cfg) {
     });
 
     g.appendChild(dot);
-
-    if (pkt.label) {
-      /* Background pill for readability */
-      const pill = svgEl('rect', {
-        x: -34, y: -26, width: 68, height: 16,
-        rx: 5,
-        fill: 'rgba(10,15,30,0.82)',
-      });
-      const txt = svgEl('text', {
-        class: 'packet-label-text',
-        x: 0, y: -18,
-        'text-anchor': 'middle',
-        'dominant-baseline': 'middle',
-      });
-      txt.textContent = pkt.label;
-      g.appendChild(pill);
-      g.appendChild(txt);
-    }
-
     packetsG.appendChild(g);
     return g;
   });
+
+  /* ── Status indicator ── */
+  const statusEl = document.createElement('div');
+  statusEl.className = 'flow-status idle';
+  statusEl.setAttribute('aria-live', 'polite');
+  statusEl.innerHTML = `
+    <span class="flow-status-dot"></span>
+    <span class="flow-status-label">Đang chờ...</span>
+    <span class="flow-status-step">0 / ${cfg.packets.length}</span>
+  `;
+  const statusDot   = statusEl.querySelector('.flow-status-dot');
+  const statusLabel = statusEl.querySelector('.flow-status-label');
+  const statusStep  = statusEl.querySelector('.flow-status-step');
 
   /* ── Controls ── */
   const controls = document.createElement('div');
@@ -637,6 +631,7 @@ function buildDiagram(container, id, cfg) {
   container.appendChild(header);
   container.appendChild(legend);
   container.appendChild(svgWrap);
+  container.appendChild(statusEl);
   container.appendChild(controls);
 
   /* ── Animation state ── */
@@ -647,6 +642,7 @@ function buildDiagram(container, id, cfg) {
     pausedAt:  null,
     rafId:     null,
     visible:   true,
+    lastLabel: null, /* cache to avoid redundant DOM writes */
   };
 
   /* Compute packet SVG position at cycleTime ms into cycle */
@@ -696,16 +692,47 @@ function buildDiagram(container, id, cfg) {
     const elapsed   = (now - state.startTime) * state.speed;
     const cycleTime = elapsed % cfg.cycleDuration;
 
+    /* Find the most recently started active packet (highest t ≤ cycleTime that is still in flight) */
+    let activeIdx   = -1;
+    let activeStart = -1;
+
     cfg.packets.forEach((pkt, i) => {
       const el  = packetEls[i];
       const pos = getPacketPos(pkt, cycleTime);
       if (pos) {
         el.setAttribute('opacity', '1');
         el.setAttribute('transform', `translate(${pos.x.toFixed(2)} ${pos.y.toFixed(2)})`);
+        /* Track most-recently-started active packet */
+        if (pkt.t >= activeStart) {
+          activeStart = pkt.t;
+          activeIdx   = i;
+        }
       } else {
         el.setAttribute('opacity', '0');
       }
     });
+
+    /* Update status indicator — only on change */
+    if (activeIdx !== -1 && cfg.packets[activeIdx].label) {
+      const pkt       = cfg.packets[activeIdx];
+      const cacheKey  = `${activeIdx}:${pkt.label}`;
+      if (state.lastLabel !== cacheKey) {
+        state.lastLabel = cacheKey;
+        statusEl.classList.remove('idle');
+        statusDot.style.backgroundColor = pkt.color;
+        statusLabel.textContent          = pkt.label;
+        statusStep.textContent           = `${activeIdx + 1} / ${cfg.packets.length}`;
+      }
+    } else {
+      const idleKey = 'idle';
+      if (state.lastLabel !== idleKey) {
+        state.lastLabel = idleKey;
+        statusEl.classList.add('idle');
+        statusDot.style.backgroundColor = '';
+        statusLabel.textContent          = 'Hoàn tất — chuẩn bị lặp lại...';
+        statusStep.textContent           = `${cfg.packets.length} / ${cfg.packets.length}`;
+      }
+    }
 
     state.rafId = requestAnimationFrame(tick);
   }
