@@ -248,8 +248,7 @@ Sửa `/etc/nginx/nginx.conf`, thêm **ngoài** block `http { }`:
 ```nginx
 stream {
     map $ssl_preread_server_name $backend {
-        dashboard.33.id.vn   127.0.0.1:1807;    # Dashboard (HTTP, via proxy)
-        ~^.*\.33\.id\.vn$    127.0.0.1:8443;    # htn-tunnel (TLS passthrough)
+        ~^(.+\.)?33\.id\.vn$    127.0.0.1:8443;    # htn-tunnel (TLS passthrough)
         default              127.0.0.1:4430;     # nginx HTTP (TLS termination)
     }
     server {
@@ -260,7 +259,7 @@ stream {
 }
 ```
 
-**Chú ý:** Dashboard chạy trên HTTP (:1807), nhưng clients kết nối qua HTTPS (443). nginx stream module route SNI `dashboard.33.id.vn` tới :1807, bỏ qua TLS handshake (vì backend là HTTP). Clients sẽ thấy certificate warning — điều này bình thường.
+**Chú ý:** Dashboard sẽ được HTTPProxy của `htn-tunnel` tự động reverse-proxy nội bộ từ HTTPS (port 8443) sang HTTP (port 1807). Do đó, Nginx chỉ cần pass toàn bộ traffic `*.33.id.vn` vào port 8443.
 
 ### 5.3 Reload nginx
 

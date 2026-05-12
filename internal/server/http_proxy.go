@@ -136,6 +136,26 @@ func (p *HTTPProxy) handleTLSConn(conn net.Conn) {
 
 // serveRequest proxies one HTTP request to the tunnel for subdomain.
 func (p *HTTPProxy) serveRequest(w http.ResponseWriter, r *http.Request, subdomain string) {
+	isSpecial := subdomain == "dashboard" || subdomain == "admin" || subdomain == "www" || subdomain == ""
+	if isSpecial && p.cfg.DashboardEnabled {
+		dashboardAddr := p.cfg.DashboardAddr
+		if strings.HasPrefix(dashboardAddr, ":") {
+			dashboardAddr = "127.0.0.1" + dashboardAddr
+		} else if strings.HasPrefix(dashboardAddr, "0.0.0.0:") {
+			dashboardAddr = "127.0.0.1" + strings.TrimPrefix(dashboardAddr, "0.0.0.0")
+		}
+
+		proxy := &httputil.ReverseProxy{
+			Director: func(req *http.Request) {
+				req.URL.Scheme = "http"
+				req.URL.Host = dashboardAddr
+				addForwardingHeaders(req, r)
+			},
+		}
+		proxy.ServeHTTP(w, r)
+		return
+	}
+
 	ts := p.tunnelManager.LookupHTTP(subdomain)
 	if ts == nil {
 		http.Error(w, "tunnel not found for subdomain: "+subdomain, http.StatusBadGateway)
@@ -358,6 +378,9 @@ func (p *HTTPProxy) extractSubdomain(host string) string {
 	h := host
 	if idx := strings.LastIndex(h, ":"); idx >= 0 {
 		h = h[:idx]
+	}
+	if strings.ToLower(h) == strings.ToLower(p.cfg.Domain) {
+		return ""
 	}
 	suffix := "." + p.cfg.Domain
 	if !strings.HasSuffix(h, suffix) {

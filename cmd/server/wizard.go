@@ -36,10 +36,23 @@ func runWizard() error {
 	httpRedirectAddr := ":80"
 	nginxDetected := isPortInUse(443)
 	if nginxDetected {
-		fmt.Print("\n  Port 443 đang được sử dụng (nginx?).\n")
+		fmt.Print("\n  Port 443 đang được sử dụng.\n")
 		fmt.Print("  Sẽ dùng port 8443/8444 — cần cấu hình nginx SNI passthrough.\n")
 		httpProxyAddr = ":8443"
 		httpRedirectAddr = ":8444"
+
+		if _, err := os.Stat("/etc/nginx/nginx.conf"); err == nil {
+			ans := promptDefault("\n  Phát hiện Nginx! Bạn có muốn tự động cấu hình Nginx SNI passthrough (chuyển port 443 -> 4430 và thêm stream block) không? (y/n)", "y")
+			if strings.ToLower(ans) == "y" || strings.ToLower(ans) == "yes" {
+				fmt.Printf("  Đang tự động cấu hình Nginx ...")
+				if err := autoConfigureNginx(domain); err != nil {
+					fmt.Printf(" FAIL\n  %v\n", err)
+				} else {
+					fmt.Println(" OK")
+					nginxDetected = false // Thành công thì không cần in hướng dẫn thủ công nữa
+				}
+			}
+		}
 	}
 
 	fmt.Printf("\n  Checking DNS for *.%s ...", domain)
@@ -88,7 +101,7 @@ func runWizard() error {
 		fmt.Printf("  Add SNI passthrough in nginx stream block:\n\n")
 		fmt.Printf("    stream {\n")
 		fmt.Printf("      map $ssl_preread_server_name $backend {\n")
-		fmt.Printf("        ~\\.%s$  127.0.0.1:8443;\n", strings.ReplaceAll(domain, ".", "\\."))
+		fmt.Printf("        ~^(.+\\.)?%s$  127.0.0.1:8443;\n", strings.ReplaceAll(domain, ".", "\\."))
 		fmt.Printf("        default         127.0.0.1:4430;\n")
 		fmt.Printf("      }\n")
 		fmt.Printf("      server {\n")
@@ -239,4 +252,58 @@ WantedBy=multi-user.target
 
 func startService() error {
 	return exec.Command("systemctl", "enable", "--now", "htn-tunnel").Run()
+}
+
+func autoConfigureNginx(domain string) error {
+	cmd := exec.Command("bash", "-c", `
+	if [ -d /etc/nginx/conf.d ]; then
+		sed -i 's/listen 443 ssl/listen 4430 ssl/g' /etc/nginx/conf.d/*.conf 2>/dev/null || true
+		sed -i 's/listen \[::\]:443 ssl/listen [::]:4430 ssl/g' /etc/nginx/conf.d/*.conf 2>/dev/null || true
+		sed -i 's/listen 443;/listen 4430;/g' /etc/nginx/conf.d/*.conf 2>/dev/null || true
+	fi
+	if [ -d /etc/nginx/sites-enabled ]; then
+		sed -i 's/listen 443 ssl/listen 4430 ssl/g' /etc/nginx/sites-enabled/* 2>/dev/null || true
+		sed -i 's/listen \[::\]:443 ssl/listen [::]:4430 ssl/g' /etc/nginx/sites-enabled/* 2>/dev/null || true
+		sed -i 's/listen 443;/listen 4430;/g' /etc/nginx/sites-enabled/* 2>/dev/null || true
+	fi
+	`)
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("\n  [Warning] Lỗi khi đổi port 443 -> 4430: %v\n", err)
+	}
+
+	nginxConf, err := os.ReadFile("/etc/nginx/nginx.conf")
+	if err != nil {
+		return fmt.Errorf("không đọc được /etc/nginx/nginx.conf: %v", err)
+	}
+	content := string(nginxConf)
+	if !strings.Contains(content, "stream {") {
+		streamBlock := fmt.Sprintf(`
+stream {
+    map $ssl_preread_server_name $backend {
+        ~^(.+\.)?%s$    127.0.0.1:8443;
+        default      127.0.0.1:4430;
+    }
+    server {
+        listen 443;
+        ssl_preread on;
+        proxy_pass $backend;
+    }
+}
+`, strings.ReplaceAll(domain, ".", "\\."))
+		content = content + "\n" + streamBlock + "\n"
+		if err := os.WriteFile("/etc/nginx/nginx.conf", []byte(content), 0644); err != nil {
+			return fmt.Errorf("không ghi được /etc/nginx/nginx.conf: %v", err)
+		}
+	} else {
+		fmt.Printf("\n  [Info] nginx.conf đã có block 'stream'. Vui lòng kiểm tra lại cấu hình thủ công.\n  ")
+	}
+
+	if err := exec.Command("nginx", "-t").Run(); err != nil {
+		return fmt.Errorf("nginx -t báo lỗi. Kiểm tra cú pháp /etc/nginx/nginx.conf")
+	}
+	if err := exec.Command("systemctl", "reload", "nginx").Run(); err != nil {
+		return fmt.Errorf("lỗi reload nginx qua systemctl")
+	}
+
+	return nil
 }
